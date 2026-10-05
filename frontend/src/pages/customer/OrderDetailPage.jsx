@@ -120,7 +120,7 @@ export default function OrderDetailPage() {
     fetchLiveDetail();
   }, [id, setOrders]);
 
-  // ค้นหาออเดอร์จริงจาก state หรือ cache (ไม่มี mock สำรอง)
+  // ค้นหาออเดอร์จริงจาก state หรือ cache
   const order = useMemo(() => {
     const list = orders && orders.length > 0 
       ? orders 
@@ -292,7 +292,7 @@ export default function OrderDetailPage() {
 
         {/* ================= แบบที่ 1: กำลังดำเนินการ (Step 1-6) ================= */}
         {!isCompleted ? (
-          <div className="flex-1 overflow-y-auto px-5 py-5 pb-28 flex flex-col gap-4">
+          <div className="flex-1 overflow-y-auto px-5 py-5 pb-32 flex flex-col gap-4">
             
             {/* การ์ดสถานะปัจจุบัน */}
             <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs flex items-center justify-between">
@@ -426,6 +426,15 @@ export default function OrderDetailPage() {
               <AlertCircle size={14} className="text-red-500" /> แจ้งปัญหาเกี่ยวกับออเดอร์นี้
             </button>
 
+            {/* ปุ่มปิด (กลับสู่หน้าหลัก) */}
+            <button
+              type="button"
+              onClick={() => navigate('/home')}
+              className="w-full py-3.5 rounded-2xl bg-slate-700 hover:bg-slate-800 text-white font-bold text-xs shadow-sm active:scale-[0.98] transition cursor-pointer flex items-center justify-center gap-2"
+            >
+              ปิด
+            </button>
+
           </div>
         ) : (
           /* ================= แบบที่ 2: ใบเสร็จรับเงิน (Step 7 ส่งสำเร็จแล้ว) ================= */
@@ -438,7 +447,7 @@ export default function OrderDetailPage() {
                 <div className="mb-2">
                   <OfficialNnLogo />
                 </div>
-                <p className="text-[11.5px] text-slate-400 mt-1">บริการรับ-ส่ง ซัก อบ พับ ถึงหน้าบ้านคุณ</p>
+                <p className="text-[11.5px] text-slate-400 mt-1">บริการรับ-ส่ง ซัก อบ พับ ถึงหน้าห้องพักคุณ</p>
                 
                 <div className="mt-3 inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">
                   <CheckCircle2 size={13} className="text-emerald-600" /> จัดส่งผ้าคืนสำเร็จ
@@ -593,7 +602,7 @@ export default function OrderDetailPage() {
               <AlertCircle size={14} className="text-red-500" /> แจ้งปัญหาเกี่ยวกับออเดอร์นี้
             </button>
 
-            {/* ปุ่มปิด */}
+            {/* ปุ่มปิด (ส่วนใบเสร็จ) */}
             <button
               type="button"
               onClick={handleFinish}
