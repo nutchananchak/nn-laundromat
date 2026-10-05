@@ -56,9 +56,9 @@ export default function PaymentPage() {
   };
 
   const bankAccount = {
-    bankName: 'ธนาคารกสิกรไทย (KBANK)',
-    accountNumber: '123-4-56789-0',
-    accountName: 'บริษัท เอ็นแอนด์เอ็น ลอนดรอแมท จำกัด',
+    bankName: 'ธนาคารไทยพาณิชย์ (SCB)',
+    accountNumber: '133-236365-9',
+    accountName: 'ธิดาพร อู่แสงทอง',
   };
 
   // ดึง PromptPay QR Code จริงจาก Backend (มาตรฐาน EMVCo)
