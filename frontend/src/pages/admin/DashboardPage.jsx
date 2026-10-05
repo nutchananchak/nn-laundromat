@@ -1449,7 +1449,7 @@ const DashboardPage = () => {
                       {dailyRevenue.toLocaleString()} บาท
                     </span>
                     <span className="text-xs text-slate-500 font-semibold mt-1.5 block">
-                      {dailyRevenue > 0 ? 'ชำระพร้อมเพย์สำเร็จ' : 'ยังไม่มีรายการชำระวันนี้'}
+                      {dailyRevenue > 0 ? 'ชำระเงินสำเร็จ' : 'ยังไม่มีรายการชำระวันนี้'}
                     </span>
                   </div>
                   <div className="w-13 h-13 rounded-2xl bg-blue-50 text-[#1d61f2] flex items-center justify-center shrink-0">
@@ -1685,7 +1685,7 @@ const DashboardPage = () => {
                                   +{(Number(o.totalPrice || o.price) || 0).toLocaleString()} ฿
                                 </span>
                                 <span className="text-xs text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 inline-block mt-0.5">
-                                  พร้อมเพย์สำเร็จ
+                                  ชำระเงินสำเร็จ
                                 </span>
                               </div>
                             </div>
