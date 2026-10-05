@@ -13,9 +13,9 @@ export const generatePromptPayQR = async (req, res) => {
       return res.status(400).json({ message: 'กรุณาระบุยอดเงินที่ถูกต้อง' });
     }
 
-    // หมายเลขพร้อมเพย์ร้านค้า (ใส่เบอร์มือถือ 10 หลัก หรือเลขประจำตัวผู้เสียภาษี 13 หลัก)
-    // สามารถตั้งค่าผ่าน .env ได้ เช่น PROMPTPAY_ID=0891234567
-    const promptPayId = process.env.PROMPTPAY_ID || '0891234567';
+    // หมายเลขพร้อมเพย์ร้านค้า 
+    // สามารถตั้งค่าผ่าน .env ได้ เช่น PROMPTPAY_ID=0898917104
+    const promptPayId = process.env.PROMPTPAY_ID || '0898917104';
 
     // แปลงข้อมูลเป็น Payload มาตรฐาน PromptPay
     const payload = generatePayload(promptPayId, { amount: Number(amount) });
