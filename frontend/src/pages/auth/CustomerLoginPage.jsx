@@ -110,6 +110,7 @@ const CustomerLoginPage = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [isNotRegistered, setIsNotRegistered] = useState(false);
   const [loggedInUser, setLoggedInUser] = useState(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -117,6 +118,7 @@ const CustomerLoginPage = () => {
   const handleCustomerLogin = async (e) => {
     e.preventDefault();
     setErrorMessage('');
+    setIsNotRegistered(false);
     
     try {
       setIsLoading(true);
@@ -134,7 +136,13 @@ const CustomerLoginPage = () => {
         setShowSuccessModal(true);
       }
     } catch (err) {
-      setErrorMessage(err.response?.data?.message || 'เบอร์โทรศัพท์หรือรหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง');
+      const serverMessage = err.response?.data?.message || 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ กรุณาลองใหม่อีกครั้ง';
+      setErrorMessage(serverMessage);
+
+      // ถ้าเป็น 404 แสดงว่ายังไม่เคยสมัครสมาชิก
+      if (err.response?.status === 404 || serverMessage.includes('สมัครสมาชิก')) {
+        setIsNotRegistered(true);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -156,11 +164,13 @@ const CustomerLoginPage = () => {
             border: '1px solid #fecaca',
             boxShadow: '0 4px 6px -1px rgba(239, 68, 68, 0.08)',
             display: 'flex',
-            alignItems: 'center',
-            gap: '10px'
+            flexDirection: 'column',
+            gap: '8px'
           }}>
-            <AlertTriangleIcon size={18} color="#dc2626" />
-            <span>{errorMessage}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <AlertTriangleIcon size={18} color="#dc2626" />
+              <span>{errorMessage}</span>
+            </div>
           </div>
         )}
 
@@ -171,6 +181,7 @@ const CustomerLoginPage = () => {
           value={identifier}
           onChange={(e) => {
             setErrorMessage('');
+            setIsNotRegistered(false);
             setIdentifier(e.target.value.replace(/\D/g, '').slice(0, 10));
           }}
           required
