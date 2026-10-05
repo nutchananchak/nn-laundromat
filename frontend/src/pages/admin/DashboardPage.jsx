@@ -1115,13 +1115,10 @@ const DashboardPage = () => {
 
                               <td className="py-4 px-5 align-middle text-left">
                                 <div className="relative inline-flex items-center w-full">
-                                  <div className="w-6 h-6 rounded-lg bg-[#1d61f2]/10 text-[#1d61f2] flex items-center justify-center shrink-0 absolute left-2 pointer-events-none">
-                                    <Bike size={13} />
-                                  </div>
                                   <select
                                     value={selectedRiderId}
                                     onChange={(e) => setSelectedRiders({ ...selectedRiders, [order.id]: e.target.value })}
-                                    className="w-full appearance-none bg-slate-50 border border-slate-200 hover:border-[#1d61f2] focus:border-[#1d61f2] rounded-xl pl-8 pr-6 py-1.5 text-xs font-semibold text-slate-700 outline-none cursor-pointer transition shadow-2xs truncate"
+                                    className="w-full appearance-none bg-slate-50 border border-slate-200 hover:border-[#1d61f2] focus:border-[#1d61f2] rounded-xl pl-3 pr-6 py-1.5 text-xs font-semibold text-slate-700 outline-none cursor-pointer transition shadow-2xs truncate"
                                   >
                                     {riderList.map(r => (
                                       <option key={r.id} value={r.id}>
