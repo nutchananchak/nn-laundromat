@@ -61,17 +61,17 @@ export default function TaskDetailPage() {
   const [order, setOrder] = useState(() => (orders || []).find((o) => String(o.id) === String(id)));
 
   // จัดการรูปหลักฐานที่ไรเดอร์ถ่าย:
-  // - ถ้าเป็น Step 3 (เพิ่งไปรับผ้า): ต้องว่าง (null) เสมอ เพื่อให้ไรเดอร์เป็นคนถ่ายเอง
-  // - ถ้าเป็น Step 4-5 (ถ่ายรับผ้าแล้ว): แสดง riderPickupProof หรือ riderBasketImage ที่ไรเดอร์ถ่าย
-  // - ถ้าเป็น Step 6 (กำลังส่งมอบ): ต้องว่าง (null) รอให้ไรเดอร์ถ่ายส่งมอบ
-  // - ถ้าเป็น Step 7 (ส่งมอบแล้ว): แสดง proofImage
+  // - Step 3 (กำลังไปรับผ้า): ว่างเสมอ รอไรเดอร์ถ่าย
+  // - Step 4-5 (รับผ้าเข้าสู่ร้านแล้ว): แสดงรูปที่ไรเดอร์ถ่ายตอนรับผ้า (riderPickupImage)
+  // - Step 6 (กำลังนำส่งคืนลูกค้า): ว่างเสมอ รอไรเดอร์ถ่ายส่งมอบ
+  // - Step 7 (ส่งมอบสำเร็จ): แสดงรูปส่งมอบ (proofImage หรือ riderDeliveryImage)
   const getInitialProofImage = (currentOrder) => {
     if (!currentOrder) return null;
     const step = Number(currentOrder.statusStep);
-    if (step === 3) return null; // เพิ่งได้รับงาน ยังไม่ได้ถ่ายรูปรับผ้า
-    if (step >= 4 && step <= 5) return currentOrder.riderPickupImage || currentOrder.riderBasketImage || null;
-    if (step === 6) return null; // เพิ่งถึงบ้านลูกค้า รอถ่ายรูปส่งมอบ
-    if (step >= 7) return currentOrder.proofImage || null;
+    if (step === 3) return null;
+    if (step >= 4 && step <= 5) return currentOrder.riderPickupImage || null;
+    if (step === 6) return null;
+    if (step >= 7) return currentOrder.proofImage || currentOrder.riderDeliveryImage || null;
     return null;
   };
 
@@ -126,8 +126,19 @@ export default function TaskDetailPage() {
     );
   }
 
-  // รูปจุดวางผ้าของลูกค้าตอนกดสั่งซื้อ (แยกฟิลด์ชัดเจน ไม่นำรูปไรเดอร์มาปน)
-  const customerBasketImage = order.basketImage || order.customerBasketImage || order.basketPhoto || null;
+  // รูปถ่ายจุดวางผ้าของลูกค้าตอนกดสั่งซื้อ
+  // ตรวจจับเฉพาะรูปของลูกค้า และกรองไม่ให้ดึงรูปที่ไรเดอร์ถ่าย (riderPickupImage) มาแสดงเด็ดขาด
+  const customerBasketImage = (() => {
+    const potentialImg = order.customerBasketImage || order.basketImage || order.customerBasketPhoto || order.basketPhoto;
+    if (potentialImg && potentialImg !== order.riderPickupImage && potentialImg !== order.proofImage) {
+      return potentialImg;
+    }
+    // กรณีที่เคยบันทึกลง riderBasketImage ตั้งแต่ต้น แต่ต้องไม่ตรงกับรูปหลักฐานรับผ้า
+    if (order.riderBasketImage && order.riderBasketImage !== order.riderPickupImage) {
+      return order.riderBasketImage;
+    }
+    return null;
+  })();
 
   const targetCoords = (order.lat && order.lng) 
     ? { lat: Number(order.lat), lng: Number(order.lng) } 
@@ -173,7 +184,7 @@ export default function TaskDetailPage() {
     triggerToast('ลบรูปถ่ายเรียบร้อยแล้ว', 'info');
   };
 
-  // เลื่อนสถานะงาน พร้อมบันทึกรูปถ่ายตรงเข้า MySQL
+  // เลื่อนสถานะงาน พร้อมบันทึกรูปถ่ายตรงเข้า Database
   const handleAdvanceStep = async (nextStep, nextTitle) => {
     const now = new Date();
     const d = new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }).format(now);
@@ -193,15 +204,15 @@ export default function TaskDetailPage() {
         deliveredAt: isDone ? realNowTimestamp : undefined
       };
 
-      // แยกการบันทึกภาพ:
-      // ถ้ารับผ้า (เลื่อนเป็น Step 4) ให้เก็บใน riderPickupImage และ riderBasketImage
+      // แยกฟิลด์รูปถ่ายของไรเดอร์อย่างชัดเจน:
+      // ตอนรับผ้า (Step 4): เก็บเฉพาะใน riderPickupImage (ไม่ทับ riderBasketImage ของลูกค้า)
       if (nextStep === 4 && proofImage) {
         updatePayload.riderPickupImage = proofImage;
-        updatePayload.riderBasketImage = proofImage;
       }
-      // ถ้าส่งมอบ (เลื่อนเป็น Step 7) ให้เก็บใน proofImage
+      // ตอนส่งมอบผ้า (Step 7): เก็บใน proofImage และ riderDeliveryImage
       if (nextStep >= 6 && proofImage) {
         updatePayload.proofImage = proofImage;
+        updatePayload.riderDeliveryImage = proofImage;
       }
 
       await updateOrder(order.id, updatePayload);
@@ -215,8 +226,8 @@ export default function TaskDetailPage() {
             status: isDone ? 'completed' : item.status,
             isCompleted: isDone,
             riderPickupImage: updatePayload.riderPickupImage || item.riderPickupImage,
-            riderBasketImage: updatePayload.riderBasketImage || item.riderBasketImage,
             proofImage: updatePayload.proofImage || item.proofImage,
+            riderDeliveryImage: updatePayload.riderDeliveryImage || item.riderDeliveryImage,
             deliveredAt: isDone ? realNowTimestamp : item.deliveredAt,
             deliveryRiderName: activeRider?.name || item.rider?.name || 'ไรเดอร์ประจำร้าน'
           };
@@ -502,7 +513,7 @@ export default function TaskDetailPage() {
             )}
           </div>
           
-          {/* อัปโหลดรูปถ่ายหน้างานจากไรเดอร์ (เปิดเข้ามาครั้งแรกจะว่างเสมอ ให้ไรเดอร์ถ่ายเอง) */}
+          {/* อัปโหลดรูปถ่ายหน้างานจากไรเดอร์ */}
           <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-2.5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5">

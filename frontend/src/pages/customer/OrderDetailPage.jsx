@@ -11,9 +11,10 @@ import {
   Bike, 
   Phone, 
   UserCheck, 
-  Camera,
-  X,
-  Image as ImageIcon
+  Camera, 
+  X, 
+  Image as ImageIcon,
+  Loader2
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { fetchOrders } from '../../api/order';
@@ -98,7 +99,9 @@ export default function OrderDetailPage() {
   const location = useLocation();
   const { orders, setOrders } = useApp ? useApp() : {};
 
-  // ดึงข้อมูลออเดอร์สดจาก MySQL เมื่อเข้าหน้านี้
+  const [isLoading, setIsLoading] = useState(true);
+
+  // ดึงข้อมูลออเดอร์สดจาก API จริง
   useEffect(() => {
     const fetchLiveDetail = async () => {
       try {
@@ -108,39 +111,25 @@ export default function OrderDetailPage() {
         }
         localStorage.setItem('orders', JSON.stringify(liveList));
       } catch (err) {
-        console.error('Failed to sync order detail from MySQL:', err);
+        console.error('Failed to sync order detail from API:', err);
+      } finally {
+        setIsLoading(false);
       }
     };
 
     fetchLiveDetail();
   }, [id, setOrders]);
 
+  // ค้นหาออเดอร์จริงจาก state หรือ cache (ไม่มี mock สำรอง)
   const order = useMemo(() => {
     const list = orders && orders.length > 0 
       ? orders 
       : JSON.parse(localStorage.getItem('orders') || '[]');
-    return list.find((o) => String(o.id) === String(id)) || {
-      id: id || 'NN-1024',
-      status: 'completed',
-      statusStep: 7,
-      statusTitle: 'จัดส่งผ้าคืนสำเร็จ',
-      serviceName: 'ซัก อบ พับ',
-      packageName: 'ตะกร้า M',
-      basePrice: 180,
-      totalPrice: 180,
-      createdAt: '-',
-      deliveredAt: '-',
-      pickupTime: '-',
-      deliveryTime: '-',
-      address: '-',
-      paymentStatus: 'ชำระเงินแล้ว',
-      specialItems: [],
-      plasticBagCount: 0,
-      rider: { name: 'วรรณา สีดา', phone: '089-111-2233', vehicle: 'ฮอนด้า เวฟ สีน้ำเงิน' }
-    };
+    return list.find((o) => String(o.id) === String(id)) || null;
   }, [orders, id]);
 
   const isCompleted = useMemo(() => {
+    if (!order) return false;
     return (
       order.status === 'completed' || 
       Number(order.statusStep) >= 7 || 
@@ -157,39 +146,35 @@ export default function OrderDetailPage() {
     }
   }, [location.state, isCompleted]);
 
-  const currentStep = Number(order.statusStep) || (isCompleted ? 7 : 1);
-  const displayCreatedAt = order.createdAt || '-';
-  const displayDeliveredAt = order.deliveredAt ? order.deliveredAt : (isCompleted ? 'ส่งมอบแล้ว' : '-');
+  // นำข้อมูลผู้ส่งมอบ/ไรเดอร์จริงจาก Database มาใช้งาน
+  const riderInfo = useMemo(() => {
+    if (!order) return null;
+    return {
+      name: order.deliveryRiderName || order.rider?.name || 'รอจัดสรรไรเดอร์',
+      phone: order.deliveryRiderPhone || order.rider?.phone || '',
+      vehicle: order.deliveryRiderVehicle || order.rider?.vehicle || 'เจ้าหน้าที่จัดส่ง N&N'
+    };
+  }, [order]);
 
-  const riderInfo = order.rider || {
-    name: order.deliveryRiderName || 'วรรณา สีดา',
-    phone: '089-111-2233',
-    vehicle: 'ไรเดอร์ประจำร้าน N&N'
-  };
-
-  const packagePrice = Number(order.basePrice || (
-    order.packageName?.includes('3.5') ? 200 :
-    order.packageName?.includes('5') ? 230 :
-    order.packageName?.includes('6') ? 250 :
-    order.packageName?.includes('S') ? 160 :
-    order.packageName?.includes('M') ? 180 :
-    order.packageName?.includes('L') ? 240 :
-    (order.packageName && !order.packageName.includes('เฉพาะ') ? (order.price || 0) : 0)
-  ));
+  const currentStep = Number(order?.statusStep) || (isCompleted ? 7 : 1);
+  const displayCreatedAt = order?.createdAt || '-';
+  const displayDeliveredAt = order?.deliveredAt || (isCompleted ? 'ส่งมอบแล้ว' : '-');
 
   const steps = useMemo(() => {
+    if (!order) return [];
     return [
-      { step: 1, title: 'ตรวจสอบยอดเงิน', desc: 'ระบบยืนยันสลิปการโอนเงินเรียบร้อย', time: displayCreatedAt },
-      { step: 2, title: 'จัดสรรไรเดอร์', desc: `มอบหมายงานให้คุณ ${riderInfo.name}`, time: currentStep >= 2 ? 'ดำเนินการแล้ว' : 'รอดำเนินการ' },
-      { step: 3, title: 'กำลังมารับผ้า', desc: 'ไรเดอร์กำลังเดินทางไปยังที่อยู่ของคุณ', time: currentStep >= 3 ? (order.pickupTime || 'กำลังเดินทาง') : 'ตามรอบเวลา' },
+      { step: 1, title: 'ตรวจสอบยอดเงิน', desc: 'ระบบตรวจสอบยอดและหลักฐานการโอนเงิน', time: displayCreatedAt },
+      { step: 2, title: 'จัดสรรไรเดอร์', desc: riderInfo?.name ? `มอบหมายงานให้คุณ ${riderInfo.name}` : 'กำลังจัดสรรไรเดอร์', time: currentStep >= 2 ? 'ดำเนินการแล้ว' : 'รอดำเนินการ' },
+      { step: 3, title: 'กำลังมารับผ้า', desc: 'ไรเดอร์กำลังเดินทางไปยังจุดรับผ้า', time: currentStep >= 3 ? (order.pickupTime || 'กำลังเดินทาง') : 'ตามรอบเวลา' },
       { step: 4, title: 'รับผ้าแล้วนำส่งร้าน', desc: 'ผ้าถึงร้าน N&N Laundromat แผนกซักอบ', time: currentStep >= 4 ? 'ถึงร้านแล้ว' : 'รอส่งมอบ' },
-      { step: 5, title: 'กำลังซักอบ', desc: 'แยกผ้าและซักอบด้วยเครื่องมาตรฐาน สะอาด ปลอดภัย', time: currentStep >= 5 ? 'กำลังดำเนินการ' : 'รอเริ่มซัก' },
-      { step: 6, title: 'อยู่ระหว่างส่งคืนผ้า', desc: 'ไรเดอร์นำผ้าพับเรียบร้อยไปส่งคืนลูกค้า', time: currentStep >= 6 ? 'กำลังนำส่ง' : (order.deliveryTime || '-') },
-      { step: 7, title: 'ส่งคืนผ้าสำเร็จ', desc: 'ไรเดอร์ได้ส่งมอบผ้าสะอาดเรียบร้อยแล้ว', time: order.deliveredAt ? order.deliveredAt : (isCompleted ? 'ส่งมอบแล้ว' : 'รอส่งมอบ') },
+      { step: 5, title: 'กำลังซักอบ', desc: 'แยกผ้าและซักอบตามมาตรฐานความสะอาด', time: currentStep >= 5 ? 'กำลังดำเนินการ' : 'รอเริ่มซัก' },
+      { step: 6, title: 'อยู่ระหว่างส่งคืนผ้า', desc: 'ไรเดอร์นำผ้าที่พับสะอาดเรียบร้อยไปส่งคืน', time: currentStep >= 6 ? 'กำลังนำส่ง' : (order.deliveryTime || '-') },
+      { step: 7, title: 'ส่งคืนผ้าสำเร็จ', desc: 'ส่งมอบผ้าสะอาดเรียบร้อยแล้ว', time: order.deliveredAt ? order.deliveredAt : (isCompleted ? 'ส่งมอบแล้ว' : 'รอส่งมอบ') },
     ];
-  }, [currentStep, order, displayCreatedAt, riderInfo.name, isCompleted]);
+  }, [currentStep, order, displayCreatedAt, riderInfo, isCompleted]);
 
   const handleReorder = () => {
+    if (!order) return;
     navigate('/order/new', {
       state: {
         service: order.serviceName?.includes('เครื่องนอน') ? 'bedding' : 'wash_dry_fold',
@@ -199,6 +184,65 @@ export default function OrderDetailPage() {
       }
     });
   };
+
+  const handleFinish = () => {
+    if (!order) return;
+    const orderIdStr = String(order.id);
+    try {
+      const viewed = JSON.parse(localStorage.getItem('viewed_completed_orders') || '[]');
+      if (!viewed.includes(orderIdStr)) {
+        const nextViewed = [...viewed, orderIdStr];
+        localStorage.setItem('viewed_completed_orders', JSON.stringify(nextViewed));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    navigate('/home');
+  };
+
+  // กรณีอยู่ระหว่างโหลดข้อมูล
+  if (isLoading && !order) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: '100vh',
+        backgroundColor: '#0f172a'
+      }}>
+        <div className="bg-white p-6 rounded-3xl shadow-lg flex flex-col items-center gap-3">
+          <Loader2 size={32} className="text-[#1d61f2] animate-spin" />
+          <span className="text-xs font-bold text-slate-700">กำลังโหลดข้อมูลคำสั่งซื้อ...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // กรณีไม่พบคำสั่งซื้อจริงใน Database
+  if (!order) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: '100vh',
+        backgroundColor: '#0f172a'
+      }}>
+        <div className="bg-white p-6 rounded-3xl shadow-lg text-center max-w-xs mx-auto">
+          <AlertCircle size={36} className="text-red-500 mx-auto mb-2" />
+          <h3 className="font-bold text-sm text-slate-900 mb-1">ไม่พบข้อมูลคำสั่งซื้อ</h3>
+          <p className="text-xs text-slate-500 mb-4">ไม่พบหมายเลขออเดอร์ #{id} ในระบบ</p>
+          <button
+            type="button"
+            onClick={() => navigate('/home')}
+            className="w-full py-2.5 bg-[#1d61f2] text-white text-xs font-bold rounded-xl cursor-pointer"
+          >
+            กลับสู่หน้าหลัก
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{
@@ -266,7 +310,7 @@ export default function OrderDetailPage() {
             </div>
 
             {/* ภาพถ่ายยืนยันจากไรเดอร์ตอนรับผ้า */}
-            {order.riderBasketImage ? (
+            {(order.riderPickupImage || order.riderBasketImage) ? (
               <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-xs flex flex-col gap-2.5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
@@ -279,13 +323,13 @@ export default function OrderDetailPage() {
                 </div>
                 <div className="w-full min-h-[160px] max-h-72 rounded-2xl overflow-hidden bg-slate-900/5 border border-slate-100 flex items-center justify-center p-2">
                   <img 
-                    src={order.riderBasketImage} 
+                    src={order.riderPickupImage || order.riderBasketImage} 
                     alt="Rider Basket Verification" 
                     className="w-full h-auto max-h-64 object-contain rounded-xl" 
                   />
                 </div>
                 <span className="text-[11px] text-slate-400 font-medium text-center">
-                  ภาพถ่ายยืนยันจุดรับผ้าโดยไรเดอร์ ({riderInfo.name})
+                  ภาพถ่ายยืนยันจุดรับผ้าโดยไรเดอร์ ({riderInfo?.name})
                 </span>
               </div>
             ) : (
@@ -306,11 +350,11 @@ export default function OrderDetailPage() {
                 </div>
                 <div>
                   <span className="text-[10px] text-slate-400 block font-medium">ผู้ดูแลการจัดส่ง (ไรเดอร์)</span>
-                  <span className="text-xs font-bold text-slate-800 block">{riderInfo.name}</span>
-                  <span className="text-[10px] text-slate-500">{riderInfo.vehicle}</span>
+                  <span className="text-xs font-bold text-slate-800 block">{riderInfo?.name}</span>
+                  <span className="text-[10px] text-slate-500">{riderInfo?.vehicle}</span>
                 </div>
               </div>
-              {riderInfo.phone && riderInfo.phone !== '-' && (
+              {riderInfo?.phone && (
                 <a
                   href={`tel:${riderInfo.phone}`}
                   className="w-9 h-9 rounded-full bg-blue-50 text-[#1d61f2] flex items-center justify-center hover:bg-blue-100 transition shadow-2xs"
@@ -361,15 +405,15 @@ export default function OrderDetailPage() {
               </div>
               <div className="flex justify-between text-slate-600 pb-2 border-b border-slate-100">
                 <span>บริการ</span>
-                <span className="font-bold text-slate-900">{order.serviceName} ({order.packageName})</span>
+                <span className="font-bold text-slate-900">{order.serviceName} {order.packageName ? `(${order.packageName})` : ''}</span>
               </div>
               <div className="flex justify-between text-slate-600 pb-2 border-b border-slate-100">
                 <span>รอบเวลารับผ้า</span>
-                <span className="font-bold text-slate-900">{order.pickupTime}</span>
+                <span className="font-bold text-slate-900">{order.pickupTime || '-'}</span>
               </div>
               <div className="flex items-start gap-2 text-slate-600 pt-1">
                 <MapPin size={15} className="text-[#1d61f2] shrink-0 mt-0.5" />
-                <span className="text-slate-800">{order.address}</span>
+                <span className="text-slate-800">{order.address || '-'}</span>
               </div>
             </div>
 
@@ -385,7 +429,7 @@ export default function OrderDetailPage() {
           </div>
         ) : (
           /* ================= แบบที่ 2: ใบเสร็จรับเงิน (Step 7 ส่งสำเร็จแล้ว) ================= */
-          <div className="flex-1 overflow-y-auto px-5 py-5 pb-28 flex flex-col gap-4">
+          <div className="flex-1 overflow-y-auto px-5 py-5 pb-32 flex flex-col gap-4">
             
             <div className="bg-white rounded-3xl p-6 shadow-xs border border-slate-200 flex flex-col gap-4 relative">
               
@@ -394,7 +438,7 @@ export default function OrderDetailPage() {
                 <div className="mb-2">
                   <OfficialNnLogo />
                 </div>
-                <p className="text-[11.5px] text-slate-400 mt-1">บริการรับ-ส่ง ซัก อบ พับ ถึงหน้าห้องพักคุณ</p>
+                <p className="text-[11.5px] text-slate-400 mt-1">บริการรับ-ส่ง ซัก อบ พับ ถึงหน้าบ้านคุณ</p>
                 
                 <div className="mt-3 inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">
                   <CheckCircle2 size={13} className="text-emerald-600" /> จัดส่งผ้าคืนสำเร็จ
@@ -442,17 +486,21 @@ export default function OrderDetailPage() {
                         <span className="font-bold text-slate-900 block">{order.serviceName}</span>
                         <span className="text-[11px] text-slate-500">{order.packageName}</span>
                       </div>
-                      <span className="font-bold text-slate-900 shrink-0">{packagePrice.toLocaleString()} ฿</span>
+                      <span className="font-bold text-slate-900 shrink-0">
+                        {Number(order.basePrice || order.packagePrice || order.price || 0).toLocaleString()} ฿
+                      </span>
                     </div>
                   )}
 
                   {order.specialItems && order.specialItems.length > 0 && (
                     <div className="pt-2 border-t border-slate-200/60 flex flex-col gap-1.5">
                       <span className="text-[11px] font-bold text-slate-700">รายการพิเศษ (แยกชิ้น):</span>
-                      {order.specialItems.map((item) => (
-                        <div key={item.id} className="flex justify-between text-xs text-slate-600">
+                      {order.specialItems.map((item, idx) => (
+                        <div key={item.id || idx} className="flex justify-between text-xs text-slate-600">
                           <span>• {item.name} x {item.count} {item.unit || 'ชิ้น'}</span>
-                          <span className="font-semibold text-slate-900">{Number(item.total || (item.price * item.count)).toLocaleString()} ฿</span>
+                          <span className="font-semibold text-slate-900">
+                            {Number(item.total || (Number(item.price || 0) * Number(item.count || 0))).toLocaleString()} ฿
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -461,7 +509,9 @@ export default function OrderDetailPage() {
                   {order.plasticBagCount > 0 && (
                     <div className="flex justify-between items-center text-xs text-slate-600 pt-2 border-t border-slate-200/60">
                       <span>• ถุงพลาสติกใส่ผ้า x {order.plasticBagCount} ใบ</span>
-                      <span className="font-semibold text-slate-900">{order.plasticBagCount * 5} ฿</span>
+                      <span className="font-semibold text-slate-900">
+                        {Number(order.plasticBagPrice || order.plasticBagCount * 5).toLocaleString()} ฿
+                      </span>
                     </div>
                   )}
                   
@@ -475,7 +525,9 @@ export default function OrderDetailPage() {
               {/* ยอดชำระสุทธิ */}
               <div className="flex justify-between items-center pt-2 border-t border-dashed border-slate-200">
                 <span className="font-bold text-xs text-slate-700">ยอดชำระสุทธิ</span>
-                <span className="font-bold text-base text-slate-900">{Number(order.totalPrice || order.price || 0).toLocaleString()} บาท</span>
+                <span className="font-bold text-base text-slate-900">
+                  {Number(order.totalPrice || order.price || 0).toLocaleString()} บาท
+                </span>
               </div>
 
               <div className="h-[1px] bg-slate-100"></div>
@@ -489,11 +541,13 @@ export default function OrderDetailPage() {
                       <UserCheck size={16} />
                     </div>
                     <div>
-                      <span className="font-bold text-slate-900 block">{riderInfo.name}</span>
-                      <span className="text-[10px] text-slate-500">{riderInfo.vehicle}</span>
+                      <span className="font-bold text-slate-900 block">{riderInfo?.name}</span>
+                      <span className="text-[10px] text-slate-500">{riderInfo?.vehicle}</span>
                     </div>
                   </div>
-                  <span className="text-[11px] font-bold text-slate-800">{riderInfo.phone}</span>
+                  {riderInfo?.phone && (
+                    <span className="text-[11px] font-bold text-slate-800">{riderInfo.phone}</span>
+                  )}
                 </div>
               </div>
 
@@ -515,7 +569,7 @@ export default function OrderDetailPage() {
                 </div>
                 <div className="flex items-start gap-2.5 text-slate-600 mt-1">
                   <MapPin size={15} className="text-slate-700 shrink-0 mt-0.5" />
-                  <span className="text-slate-800">{order.address}</span>
+                  <span className="text-slate-800">{order.address || '-'}</span>
                 </div>
               </div>
 
@@ -537,6 +591,15 @@ export default function OrderDetailPage() {
               className="w-full py-3 rounded-2xl bg-red-50/40 border border-red-200 text-red-600 font-bold text-xs hover:bg-red-50 transition cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs"
             >
               <AlertCircle size={14} className="text-red-500" /> แจ้งปัญหาเกี่ยวกับออเดอร์นี้
+            </button>
+
+            {/* ปุ่มปิด */}
+            <button
+              type="button"
+              onClick={handleFinish}
+              className="w-full py-3.5 rounded-2xl bg-slate-700 hover:bg-slate-800 text-white font-bold text-xs shadow-sm active:scale-[0.98] transition cursor-pointer flex items-center justify-center gap-2"
+            >
+              ปิด
             </button>
 
           </div>
@@ -567,9 +630,9 @@ export default function OrderDetailPage() {
               </div>
 
               <div className="w-full min-h-[180px] max-h-80 rounded-2xl overflow-hidden bg-slate-900/5 border border-slate-200 flex items-center justify-center p-2">
-                {order.proofImage || order.riderBasketImage ? (
+                {order.proofImage || order.riderDeliveryImage ? (
                   <img
-                    src={order.proofImage || order.riderBasketImage}
+                    src={order.proofImage || order.riderDeliveryImage}
                     alt="Delivery Confirmation"
                     className="w-full h-auto max-h-72 object-contain rounded-xl shadow-2xs"
                   />
@@ -584,7 +647,7 @@ export default function OrderDetailPage() {
               <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-1.5 text-xs text-slate-600">
                 <div className="flex justify-between">
                   <span className="text-slate-400">ผู้ส่งมอบ:</span>
-                  <span className="font-bold text-slate-800">{riderInfo.name}</span>
+                  <span className="font-bold text-slate-800">{riderInfo?.name}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">เวลาส่งมอบสำเร็จ:</span>
@@ -592,7 +655,7 @@ export default function OrderDetailPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">สถานที่จัดส่ง:</span>
-                  <span className="font-medium text-slate-800 truncate max-w-[200px]">{order.address}</span>
+                  <span className="font-medium text-slate-800 truncate max-w-[200px]">{order.address || '-'}</span>
                 </div>
               </div>
 
