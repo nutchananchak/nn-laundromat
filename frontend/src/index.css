@@ -16,7 +16,7 @@ body {
   font-family: var(--font-body);
 }
 
-@keyframes float-slow {
+  @keyframes float-slow {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-14px); }
 }
