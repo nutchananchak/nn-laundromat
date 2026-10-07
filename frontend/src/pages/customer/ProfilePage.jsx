@@ -75,7 +75,6 @@ export default function ProfilePage() {
     }, 2800);
   };
 
-  // Custom Modal สำหรับยืนยันการทำรายการต่างๆ เช่น ออกจากระบบ หรือ ลบที่อยู่
   const [confirmModal, setConfirmModal] = useState({
     isOpen: false,
     title: '',
@@ -105,7 +104,6 @@ export default function ProfilePage() {
   // OTP State
   const [otpStep, setOtpStep] = useState('input');
   const [inputOtp, setInputOtp] = useState('');
-  const [serverGeneratedOtp, setServerGeneratedOtp] = useState('');
   const [otpCountdown, setOtpCountdown] = useState(60);
   const [isRequestingOtp, setIsRequestingOtp] = useState(false);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
@@ -467,7 +465,7 @@ export default function ProfilePage() {
     }
   };
 
-  // 1. ตรวจสอบการเปลี่ยนเบอร์และขอ OTP จริงจาก Backend
+  // 1. ตรวจสอบการเปลี่ยนเบอร์และขอ OTP ส่ง SMS ผ่าน Thaibulksms
   const handleInitiateProfileSave = async (e) => {
     e.preventDefault();
     const trimmedName = editName.trim();
@@ -488,12 +486,11 @@ export default function ProfilePage() {
       try {
         setIsRequestingOtp(true);
         const res = await requestOtpApi(trimmedPhone);
-        if (res.success && res.devOtp) {
-          setServerGeneratedOtp(res.devOtp);
+        if (res.success) {
           setOtpStep('verify');
           setOtpCountdown(60);
           setInputOtp('');
-          showToast(`ส่งรหัส OTP จาก Server สำเร็จ! (รหัส: ${res.devOtp})`, 'success');
+          showToast('ส่งรหัส OTP ไปยังหมายเลขโทรศัพท์ของคุณแล้ว', 'success');
         }
       } catch (err) {
         showToast(err.response?.data?.message || 'ไม่สามารถส่ง OTP ได้ กรุณาลองใหม่', 'error');
@@ -527,19 +524,25 @@ export default function ProfilePage() {
     }
   };
 
-  // 3. บันทึกข้อมูลโปรไฟล์ลง MySQL และ State
+  // 3. บันทึกข้อมูลโปรไฟล์ลง MySQL และป้องกันการเขียนทับบัญชีอื่น
   const finalizeProfileUpdate = async (name, phone) => {
     try {
-      if (userProfile?.phone) {
-        await updateProfileApi(userProfile.phone, { name });
-      }
+      const originalPhone = userProfile?.phone || '';
+      
+      const res = await updateProfileApi(originalPhone, { 
+        name,
+        new_phone: phone,
+        phone_number: phone,
+        customer_id: userProfile?.id || userProfile?.customer_id
+      });
 
       const updatedUser = {
         ...userProfile,
-        id: phone,
-        name: name,
-        fullName: name,
-        phone: phone
+        id: res.user?.id || userProfile?.id,
+        customer_id: res.user?.id || userProfile?.id,
+        name: res.user?.name || name,
+        fullName: res.user?.name || name,
+        phone: res.user?.phone || phone
       };
 
       setUserProfile(updatedUser);
@@ -548,7 +551,8 @@ export default function ProfilePage() {
       setOtpStep('input');
       showToast('บันทึกข้อมูลส่วนตัวเรียบร้อยแล้ว');
     } catch (err) {
-      showToast('อัปเดตข้อมูลไม่สำเร็จ: ' + (err.response?.data?.message || err.message), 'error');
+      const errorMsg = err.response?.data?.message || 'อัปเดตข้อมูลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
+      showToast(errorMsg, 'error');
     }
   };
 
@@ -598,7 +602,6 @@ export default function ProfilePage() {
     }, 1200);
   };
 
-  // จัดการการออกจากระบบด้วย Custom Confirm Modal
   const handleLogout = () => {
     openConfirm({
       title: 'ออกจากระบบ',
@@ -640,7 +643,7 @@ export default function ProfilePage() {
         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
       }} className="font-body text-base">
 
-        {/* Floating Toast แจ้งเตือนสไตล์พรีเมียม */}
+        {/* Floating Toast */}
         {toast.show && (
           <div className="absolute top-5 left-4 right-4 z-60 animate-in slide-in-from-top-4 duration-200">
             <div className={`p-3.5 rounded-2xl shadow-xl border flex items-center gap-3 backdrop-blur-md text-white ${
@@ -656,7 +659,7 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* Custom Confirmation Modal สำหรับ Logout / ลบรายการ */}
+        {/* Custom Confirmation Modal */}
         {confirmModal.isOpen && (
           <div className="absolute inset-0 bg-slate-900/60 z-60 flex items-center justify-center p-6 backdrop-blur-xs animate-in fade-in duration-150">
             <div className="bg-white w-full max-w-xs rounded-3xl p-6 shadow-2xl flex flex-col gap-4 text-center border border-slate-100 animate-in zoom-in-95 duration-150">
@@ -699,6 +702,7 @@ export default function ProfilePage() {
           </div>
         )}
 
+        {/* Header */}
         <div style={{
           background: 'linear-gradient(135deg, #1d61f2 0%, #1045b8 100%)',
           color: '#ffffff',
@@ -720,6 +724,7 @@ export default function ProfilePage() {
           </button>
         </div>
 
+        {/* Content Body */}
         <div className="flex-1 overflow-y-auto px-6 py-5 pb-28 flex flex-col gap-4">
 
           <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs flex flex-col items-center text-center relative">
@@ -913,6 +918,7 @@ export default function ProfilePage() {
 
         </div>
 
+        {/* Modal ที่อยู่ Google Maps */}
         {showAddressModal && (
           <div className="absolute inset-0 bg-black/75 z-50 flex items-end sm:items-center justify-center backdrop-blur-xs">
             <div className="bg-white w-full max-w-[430px] h-[92vh] max-h-[92vh] rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-200">
@@ -1104,7 +1110,7 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* Modal แก้ไขข้อมูลส่วนตัว + OTP เชื่อมต่อ Server จริง */}
+        {/* Modal แก้ไขข้อมูลส่วนตัว + OTP ส่ง SMS จริง */}
         {showEditProfileModal && (
           <div className="absolute inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-6 backdrop-blur-xs">
             <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl flex flex-col gap-4 border border-slate-100">
@@ -1171,14 +1177,14 @@ export default function ProfilePage() {
                     <div>
                       <span className="text-xs font-bold text-slate-900 block">ระบบส่งรหัส OTP 6 หลัก</span>
                       <span className="text-[11px] text-slate-500 block mt-0.5">
-                        ไปยังหมายเลข <b>{editPhone}</b> เพื่อยืนยันความถูกต้องก่อนเปลี่ยนเบอร์ล็อกอิน
+                        ไปยังหมายเลข <b>{editPhone}</b> ผ่าน SMS เพื่อยืนยันความถูกต้อง
                       </span>
                     </div>
                   </div>
 
                   <div>
                     <label className="text-xs font-bold text-slate-700 block mb-1">
-                      กรอกรหัส OTP {serverGeneratedOtp ? `(รหัสทดสอบ: ${serverGeneratedOtp})` : ''}
+                      กรอกรหัส OTP 6 หลักที่ได้รับทาง SMS
                     </label>
                     <input
                       type="text"
@@ -1200,10 +1206,9 @@ export default function ProfilePage() {
                         onClick={async () => {
                           try {
                             const res = await requestOtpApi(editPhone.trim());
-                            if (res.success && res.devOtp) {
-                              setServerGeneratedOtp(res.devOtp);
+                            if (res.success) {
                               setOtpCountdown(60);
-                              showToast(`รหัส OTP ใหม่คือ: ${res.devOtp}`, 'success');
+                              showToast('ส่งรหัส OTP ไปยังหมายเลขโทรศัพท์ของคุณแล้ว', 'success');
                             }
                           } catch (err) {
                             showToast('ส่งรหัสใหม่ไม่สำเร็จ', 'error');
@@ -1238,6 +1243,7 @@ export default function ProfilePage() {
           </div>
         )}
 
+        {/* Modal แจ้งเรื่องร้องเรียน */}
         {showReportModal && (
           <div className="absolute inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-6 backdrop-blur-xs">
             <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl flex flex-col gap-3.5 border border-slate-100">

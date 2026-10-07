@@ -1003,7 +1003,7 @@ const DashboardPage = () => {
 
         <div className="flex-1 overflow-y-auto p-6">
 
-          {/* ======================= แท็บ 1: ตรวจสอบสลิป ======================= */}
+          {/* ======================= แท็บ 1: ตรวจสอบสลิป (เพิ่มช่องเวลารับ-ส่งผ้า) ======================= */}
           {activeTab === 'slips' && (
             <div className="space-y-6">
               <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
@@ -1023,16 +1023,17 @@ const DashboardPage = () => {
                   </div>
                 ) : (
                   <div className="w-full overflow-x-auto">
-                    <table className="w-full text-left text-sm border-collapse min-w-[950px]">
+                    <table className="w-full text-left text-sm border-collapse min-w-[1100px]">
                       <thead>
                         <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold text-xs uppercase tracking-wider">
                           <th className="py-4 px-5 text-left w-36">เลขออเดอร์</th>
-                          <th className="py-4 px-5 text-left w-44">ลูกค้า</th>
-                          <th className="py-4 px-5 text-left">สถานที่รับผ้า</th>
-                          <th className="py-4 px-5 text-left w-40">บริการ</th>
-                          <th className="py-4 px-5 text-left w-32">ยอดโอน</th>
-                          <th className="py-4 px-5 text-center w-28">สลิป</th>
-                          <th className="py-4 px-5 text-left w-44">ไรเดอร์</th>
+                          <th className="py-4 px-4 text-left w-40">ลูกค้า</th>
+                          <th className="py-4 px-4 text-left">สถานที่รับผ้า</th>
+                          <th className="py-4 px-4 text-left w-36">บริการ</th>
+                          <th className="py-4 px-4 text-left w-48">รอบเวลารับ-ส่ง</th>
+                          <th className="py-4 px-4 text-left w-28">ยอดโอน</th>
+                          <th className="py-4 px-4 text-center w-28">สลิป</th>
+                          <th className="py-4 px-4 text-left w-44">ไรเดอร์</th>
                           <th className="py-4 px-5 text-center w-36">ดำเนินการ</th>
                         </tr>
                       </thead>
@@ -1052,7 +1053,7 @@ const DashboardPage = () => {
                                 </span>
                               </td>
 
-                              <td className="py-4 px-5 align-middle text-left">
+                              <td className="py-4 px-4 align-middle text-left">
                                 <span className="font-bold text-slate-800 text-sm block truncate" title={order.customerName}>
                                   {order.customerName || 'คุณลูกค้า'}
                                 </span>
@@ -1061,11 +1062,11 @@ const DashboardPage = () => {
                                 </span>
                               </td>
 
-                              <td className="py-4 px-5 align-middle text-left">
+                              <td className="py-4 px-4 align-middle text-left">
                                 <button
                                   type="button"
                                   onClick={() => handleOpenMap(order)}
-                                  className="group text-left inline-flex items-start gap-1.5 p-2 rounded-xl bg-blue-50/60 hover:bg-blue-100/80 border border-blue-100 transition cursor-pointer max-w-md w-full"
+                                  className="group text-left inline-flex items-start gap-1.5 p-2 rounded-xl bg-blue-50/60 hover:bg-blue-100/80 border border-blue-100 transition cursor-pointer max-w-xs w-full"
                                   title="แตะเพื่อเปิดพิกัดนำทางบน Google Maps"
                                 >
                                   <MapPin size={15} className="text-[#1d61f2] shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
@@ -1077,7 +1078,7 @@ const DashboardPage = () => {
                                 </button>
                               </td>
 
-                              <td className="py-4 px-5 align-middle text-left">
+                              <td className="py-4 px-4 align-middle text-left">
                                 <span className="font-bold text-slate-800 text-sm block truncate" title={order.serviceName}>
                                   {order.serviceName}
                                 </span>
@@ -1088,13 +1089,29 @@ const DashboardPage = () => {
                                 )}
                               </td>
 
-                              <td className="py-4 px-5 align-middle text-left whitespace-nowrap">
+                              {/* ช่องรอบเวลารับ-ส่งผ้าที่ลูกค้าจอง */}
+                              <td className="py-4 px-4 align-middle text-left whitespace-nowrap">
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-1.5 text-xs text-slate-700">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"></span>
+                                    <span className="text-slate-400 font-medium">รับ:</span>
+                                    <span className="font-bold text-slate-800">{order.pickupTime || 'ไม่ระบุ'}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 text-xs text-slate-700">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                                    <span className="text-slate-400 font-medium">ส่ง:</span>
+                                    <span className="font-bold text-slate-800">{order.deliveryTime || 'ไม่ระบุ'}</span>
+                                  </div>
+                                </div>
+                              </td>
+
+                              <td className="py-4 px-4 align-middle text-left whitespace-nowrap">
                                 <span className="font-extrabold text-slate-900 text-sm">
                                   {(order.totalPrice || order.price || 0).toLocaleString()} ฿
                                 </span>
                               </td>
 
-                              <td className="py-4 px-5 align-middle text-center">
+                              <td className="py-4 px-4 align-middle text-center">
                                 <button
                                   type="button"
                                   onClick={() => setSelectedSlipModal(order)}
@@ -1113,7 +1130,7 @@ const DashboardPage = () => {
                                 </button>
                               </td>
 
-                              <td className="py-4 px-5 align-middle text-left">
+                              <td className="py-4 px-4 align-middle text-left">
                                 <div className="relative inline-flex items-center w-full">
                                   <select
                                     value={selectedRiderId}
@@ -1333,7 +1350,7 @@ const DashboardPage = () => {
             </div>
           )}
 
-          {/* ======================= แท็บ 3.1: ออเดอร์ที่ถูกยกเลิก (ขยับลูกค้ากับบริการชิดกัน) ======================= */}
+          {/* ======================= แท็บ 3.1: ออเดอร์ที่ถูกยกเลิก ======================= */}
           {activeTab === 'cancelled' && (
             <div className="space-y-6">
               <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden p-6">
@@ -1700,7 +1717,7 @@ const DashboardPage = () => {
             </div>
           )}
 
-          {/* ======================= แท็บ 5: รายการปัญหาจากลูกค้า (ขยับลูกค้ากับหมวดหมู่ปัญหาชิดกัน) ======================= */}
+          {/* ======================= แท็บ 5: รายการปัญหาจากลูกค้า ======================= */}
           {activeTab === 'reports' && (
             <div className="space-y-6">
               <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden p-6">
@@ -1878,11 +1895,11 @@ const DashboardPage = () => {
 
       {/* Modal แสดงรูปสลิป / รูปหลักฐาน */}
       {selectedSlipModal && (
-        <div
+        <div 
           className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-150"
           onClick={() => setSelectedSlipModal(null)}
         >
-          <div
+          <div 
             className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl flex flex-col gap-4"
             onClick={(e) => e.stopPropagation()}
           >

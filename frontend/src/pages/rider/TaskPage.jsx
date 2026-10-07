@@ -14,8 +14,8 @@ import {
   Filter,
   RefreshCw,
   AlertTriangle,
-  HelpCircle,
-  X
+  Camera,
+  Check
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { fetchOrders, updateOrder } from '../../api/order';
@@ -104,7 +104,7 @@ const TaskPage = () => {
   const [historyFilterType, setHistoryFilterType] = useState('today');
   const [selectedCustomDate, setSelectedCustomDate] = useState(getTodayDateStr());
 
-  // จัดการการออกจากระบบด้วย Custom Confirm Modal ดีไซน์โมเดิร์น
+  // จัดการการออกจากระบบ
   const handleLogout = () => {
     openConfirm({
       title: 'ออกจากระบบพนักงาน',
@@ -207,6 +207,32 @@ const TaskPage = () => {
     }
   };
 
+  // ตรวจสอบรูปถ่ายก่อนกดยืนยันรับผ้าจากลูกค้า (Step 3 -> 4)
+  const handleConfirmPickupOrder = (order) => {
+    const hasPickupProof = Boolean(order.riderPickupImage || order.riderBasketImage);
+
+    if (!hasPickupProof) {
+      triggerToast('กรุณาถ่ายรูปยืนยันจุดรับผ้าก่อนยืนยันรับงาน', 'error');
+      navigate(`/rider/tasks/${order.id}`);
+      return;
+    }
+
+    handleAdvanceStep(order.id, 4, 'รับผ้าเข้าสู่ร้านเรียบร้อย');
+  };
+
+  // ตรวจสอบรูปถ่ายก่อนกดยืนยันส่งมอบผ้าคืนลูกค้า (Step 6 -> 7)
+  const handleConfirmReturnOrder = (order) => {
+    const hasDeliveryProof = Boolean(order.proofImage || order.riderDeliveryImage);
+
+    if (!hasDeliveryProof) {
+      triggerToast('กรุณาถ่ายรูปยืนยันการส่งมอบผ้าหน้างานก่อนปิดงาน', 'error');
+      navigate(`/rider/tasks/${order.id}`);
+      return;
+    }
+
+    handleAdvanceStep(order.id, 7, 'จัดส่งผ้าคืนสำเร็จ');
+  };
+
   const totalUrgentTasks = myPickupOrders.length + myReturnOrders.length;
 
   return (
@@ -233,7 +259,7 @@ const TaskPage = () => {
         boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
       }}>
 
-        {/* Floating Toast แจ้งเตือนสไตล์พรีเมียม สวยงาม คมชัด */}
+        {/* Floating Toast */}
         {toast.show && (
           <div className="absolute top-5 left-4 right-4 z-50 animate-in slide-in-from-top-4 duration-200">
             <div className={`p-3.5 rounded-2xl shadow-xl border flex items-center gap-3 backdrop-blur-md text-white ${
@@ -257,7 +283,7 @@ const TaskPage = () => {
           </div>
         )}
 
-        {/* Custom Confirmation Modal สำหรับออกจากระบบ */}
+        {/* Custom Confirmation Modal */}
         {confirmModal.isOpen && (
           <div className="absolute inset-0 bg-slate-900/60 z-60 flex items-center justify-center p-6 backdrop-blur-xs animate-in fade-in duration-150">
             <div className="bg-white w-full max-w-xs rounded-3xl p-6 shadow-2xl flex flex-col gap-4 text-center border border-slate-100 animate-in zoom-in-95 duration-150">
@@ -390,7 +416,7 @@ const TaskPage = () => {
             </div>
           )}
 
-          {/* แท็บ 1: รับผ้า */}
+          {/* แท็บ 1: รับผ้า (เพิ่มเงื่อนไขตรวจรูปถ่ายตอนรับผ้า Step 3) */}
           {activeTab === 'active' && (
             <>
               {myPickupOrders.length === 0 ? (
@@ -399,72 +425,88 @@ const TaskPage = () => {
                   <span className="leading-normal">ไม่มีงานรับผ้าเข้าร้านในขณะนี้</span>
                 </div>
               ) : (
-                myPickupOrders.map(order => (
-                  <div key={order.id} className="bg-white p-4 rounded-2xl border border-blue-100 shadow-sm flex flex-col gap-3 relative overflow-hidden">
-                    <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-[#1d61f2]" />
+                myPickupOrders.map(order => {
+                  const hasPickupProof = Boolean(order.riderPickupImage || order.riderBasketImage);
 
-                    <div className="flex justify-between items-center border-b border-gray-100 pb-2">
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-xs text-gray-900">ออเดอร์ #{order.id}</span>
-                          <span className="text-[10px] bg-blue-50 text-[#1d61f2] font-extrabold px-2 py-0.5 rounded-md">
-                            งานรับผ้า
-                          </span>
+                  return (
+                    <div key={order.id} className="bg-white p-4 rounded-2xl border border-blue-100 shadow-sm flex flex-col gap-3 relative overflow-hidden">
+                      <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-[#1d61f2]" />
+
+                      <div className="flex justify-between items-center border-b border-gray-100 pb-2">
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-xs text-gray-900">ออเดอร์ #{order.id}</span>
+                            <span className="text-[10px] bg-blue-50 text-[#1d61f2] font-extrabold px-2 py-0.5 rounded-md">
+                              งานรับผ้า
+                            </span>
+                          </div>
+                          <span className="text-[11px] text-[#1d61f2] font-semibold block mt-0.5">{order.statusTitle}</span>
                         </div>
-                        <span className="text-[11px] text-[#1d61f2] font-semibold block mt-0.5">{order.statusTitle}</span>
+                        {order.customerPhone && (
+                          <a
+                            href={`tel:${order.customerPhone}`}
+                            className="flex items-center gap-1 bg-blue-50 text-[#1d61f2] px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-blue-100 transition"
+                          >
+                            <Phone size={12} /> โทรหาลูกค้า
+                          </a>
+                        )}
                       </div>
-                      {order.customerPhone && (
-                        <a
-                          href={`tel:${order.customerPhone}`}
-                          className="flex items-center gap-1 bg-blue-50 text-[#1d61f2] px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-blue-100 transition"
+
+                      <div className="p-3 bg-slate-50/80 rounded-xl space-y-1 text-xs border border-slate-100">
+                        <div className="font-bold text-gray-800">ผู้สั่ง: {order.customerName || 'ลูกค้าทั่วไป'}</div>
+                        <div className="text-gray-600 flex items-start gap-1">
+                          <MapPin size={13} className="text-[#1d61f2] shrink-0 mt-0.5" />
+                          <span className="leading-relaxed">{order.address}</span>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/rider/tasks/${order.id}`)}
+                        className="w-full py-2 bg-blue-50 hover:bg-blue-100 text-[#1d61f2] font-bold text-xs rounded-xl border border-blue-100 flex items-center justify-center gap-1.5 cursor-pointer transition"
+                      >
+                        <FileText size={14} /> รายละเอียดงานและ GPS
+                      </button>
+
+                      {/* ปุ่ม Step 3: ต้องถ่ายรูปยืนยันจุดรับผ้าก่อน */}
+                      {Number(order.statusStep) === 3 && (
+                        hasPickupProof ? (
+                          <button
+                            type="button"
+                            onClick={() => handleConfirmPickupOrder(order)}
+                            className="w-full py-2.5 rounded-xl bg-[#1d61f2] text-white font-bold text-xs hover:bg-blue-700 shadow-sm shadow-blue-500/20 cursor-pointer transition active:scale-[0.99] flex items-center justify-center gap-1.5"
+                          >
+                            <Check size={15} /> รับผ้าจากลูกค้าแล้ว (กำลังนำส่งร้าน)
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleConfirmPickupOrder(order)}
+                            className="w-full py-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-800 font-bold text-xs shadow-xs cursor-pointer transition active:scale-[0.99] flex items-center justify-center gap-1.5"
+                          >
+                            <Camera size={15} className="text-amber-600" /> ถ่ายรูปจุดรับผ้าก่อนกดยืนยันรับงาน
+                          </button>
+                        )
+                      )}
+
+                      {/* ปุ่ม Step 4: นำส่งต่อแผนกซักอบ */}
+                      {Number(order.statusStep) === 4 && (
+                        <button
+                          type="button"
+                          onClick={() => handleAdvanceStep(order.id, 5, 'ร้านกำลังดำเนินการซักอบ')}
+                          className="w-full py-2.5 rounded-xl bg-blue-800 text-white font-bold text-xs hover:bg-blue-900 shadow-sm cursor-pointer transition active:scale-[0.99]"
                         >
-                          <Phone size={12} /> โทรหาลูกค้า
-                        </a>
+                          ผ้าถึงร้านแล้ว (ส่งต่อแผนกซักอบ)
+                        </button>
                       )}
                     </div>
-
-                    <div className="p-3 bg-slate-50/80 rounded-xl space-y-1 text-xs border border-slate-100">
-                      <div className="font-bold text-gray-800">ผู้สั่ง: {order.customerName || 'ลูกค้าทั่วไป'}</div>
-                      <div className="text-gray-600 flex items-start gap-1">
-                        <MapPin size={13} className="text-[#1d61f2] shrink-0 mt-0.5" />
-                        <span className="leading-relaxed">{order.address}</span>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/rider/tasks/${order.id}`)}
-                      className="w-full py-2 bg-blue-50 hover:bg-blue-100 text-[#1d61f2] font-bold text-xs rounded-xl border border-blue-100 flex items-center justify-center gap-1.5 cursor-pointer transition"
-                    >
-                      <FileText size={14} /> รายละเอียดงานและ GPS
-                    </button>
-
-                    {Number(order.statusStep) === 3 && (
-                      <button
-                        type="button"
-                        onClick={() => handleAdvanceStep(order.id, 4, 'รับผ้าเข้าสู่ร้านเรียบร้อย')}
-                        className="w-full py-2.5 rounded-xl bg-[#1d61f2] text-white font-bold text-xs hover:bg-blue-700 shadow-sm shadow-blue-500/20 cursor-pointer transition active:scale-[0.99]"
-                      >
-                        รับผ้าจากลูกค้าแล้ว (กำลังนำส่งร้าน)
-                      </button>
-                    )}
-
-                    {Number(order.statusStep) === 4 && (
-                      <button
-                        type="button"
-                        onClick={() => handleAdvanceStep(order.id, 5, 'ร้านกำลังดำเนินการซักอบ')}
-                        className="w-full py-2.5 rounded-xl bg-blue-800 text-white font-bold text-xs hover:bg-blue-900 shadow-sm cursor-pointer transition active:scale-[0.99]"
-                      >
-                        ผ้าถึงร้านแล้ว (ส่งต่อแผนกซักอบ)
-                      </button>
-                    )}
-                  </div>
-                ))
+                  );
+                })
               )}
             </>
           )}
 
-          {/* แท็บ 2: ส่งคืน */}
+          {/* แท็บ 2: ส่งคืน (มีเงื่อนไขตรวจรูปถ่ายส่งมอบ Step 6) */}
           {activeTab === 'return' && (
             <>
               {myReturnOrders.length === 0 ? (
@@ -473,55 +515,70 @@ const TaskPage = () => {
                   <span className="leading-normal">ไม่มีงานส่งคืนผ้าในขณะนี้ (รอร้านซักอบเสร็จ)</span>
                 </div>
               ) : (
-                myReturnOrders.map(order => (
-                  <div key={order.id} className="bg-white p-4 rounded-2xl border border-emerald-100 shadow-sm flex flex-col gap-3 relative overflow-hidden">
-                    <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-emerald-500" />
+                myReturnOrders.map(order => {
+                  const hasDeliveryProof = Boolean(order.proofImage || order.riderDeliveryImage);
 
-                    <div className="flex justify-between items-center border-b border-gray-100 pb-2">
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-xs text-gray-900">ออเดอร์ #{order.id}</span>
-                          <span className="text-[10px] bg-emerald-50 text-emerald-700 font-extrabold px-2 py-0.5 rounded-md">
-                            ส่งคืนผ้า
-                          </span>
+                  return (
+                    <div key={order.id} className="bg-white p-4 rounded-2xl border border-emerald-100 shadow-sm flex flex-col gap-3 relative overflow-hidden">
+                      <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-emerald-500" />
+
+                      <div className="flex justify-between items-center border-b border-gray-100 pb-2">
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-xs text-gray-900">ออเดอร์ #{order.id}</span>
+                            <span className="text-[10px] bg-emerald-50 text-emerald-700 font-extrabold px-2 py-0.5 rounded-md">
+                              ส่งคืนผ้า
+                            </span>
+                          </div>
+                          <span className="text-[11px] text-emerald-600 font-semibold block mt-0.5">ผ้าพร้อมส่งคืนลูกค้า</span>
                         </div>
-                        <span className="text-[11px] text-emerald-600 font-semibold block mt-0.5">ผ้าพร้อมส่งคืนลูกค้า</span>
+                        {order.customerPhone && (
+                          <a
+                            href={`tel:${order.customerPhone}`}
+                            className="flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-emerald-100 transition"
+                          >
+                            <Phone size={12} /> โทรแจ้งลูกค้า
+                          </a>
+                        )}
                       </div>
-                      {order.customerPhone && (
-                        <a
-                          href={`tel:${order.customerPhone}`}
-                          className="flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-emerald-100 transition"
+
+                      <div className="p-3 bg-emerald-50/40 rounded-xl space-y-1 text-xs border border-emerald-100/60">
+                        <div className="font-bold text-gray-800">ผู้รับ: {order.customerName || 'ลูกค้าทั่วไป'}</div>
+                        <div className="text-gray-600 flex items-start gap-1">
+                          <MapPin size={13} className="text-emerald-600 shrink-0 mt-0.5" />
+                          <span className="leading-relaxed">{order.address}</span>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/rider/tasks/${order.id}`)}
+                        className="w-full py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs rounded-xl border border-emerald-200 flex items-center justify-center gap-1.5 cursor-pointer transition"
+                      >
+                        <FileText size={14} /> ดูที่อยู่ส่งคืน &amp; นำทาง GPS
+                      </button>
+
+                      {/* ปุ่มยืนยันส่งมอบพร้อมเงื่อนไขตรวจรูปถ่าย */}
+                      {hasDeliveryProof ? (
+                        <button
+                          type="button"
+                          onClick={() => handleConfirmReturnOrder(order)}
+                          className="w-full py-2.5 rounded-xl bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-700 shadow-sm shadow-emerald-600/20 cursor-pointer transition active:scale-[0.99] flex items-center justify-center gap-1.5"
                         >
-                          <Phone size={12} /> โทรแจ้งลูกค้า
-                        </a>
+                          <Check size={15} /> ส่งมอบผ้าคืนลูกค้าเรียบร้อย (ปิดงาน)
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleConfirmReturnOrder(order)}
+                          className="w-full py-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-800 font-bold text-xs shadow-xs cursor-pointer transition active:scale-[0.99] flex items-center justify-center gap-1.5"
+                        >
+                          <Camera size={15} className="text-amber-600" /> ถ่ายรูปยืนยันการส่งมอบก่อนปิดงาน
+                        </button>
                       )}
                     </div>
-
-                    <div className="p-3 bg-emerald-50/40 rounded-xl space-y-1 text-xs border border-emerald-100/60">
-                      <div className="font-bold text-gray-800">ผู้รับ: {order.customerName || 'ลูกค้าทั่วไป'}</div>
-                      <div className="text-gray-600 flex items-start gap-1">
-                        <MapPin size={13} className="text-emerald-600 shrink-0 mt-0.5" />
-                        <span className="leading-relaxed">{order.address}</span>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/rider/tasks/${order.id}`)}
-                      className="w-full py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs rounded-xl border border-emerald-200 flex items-center justify-center gap-1.5 cursor-pointer transition"
-                    >
-                      <FileText size={14} /> ดูที่อยู่ส่งคืน &amp; นำทาง GPS
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleAdvanceStep(order.id, 7, 'จัดส่งผ้าคืนสำเร็จ')}
-                      className="w-full py-2.5 rounded-xl bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-700 shadow-sm shadow-emerald-600/20 cursor-pointer transition active:scale-[0.99]"
-                    >
-                      ส่งมอบผ้าคืนลูกค้าเรียบร้อย (ปิดงาน)
-                    </button>
-                  </div>
-                ))
+                  );
+                })
               )}
             </>
           )}
