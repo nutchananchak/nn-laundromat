@@ -4,7 +4,9 @@ import {
   register, 
   forgotPassword, 
   getProfile, 
-  updateProfile 
+  updateProfile,
+  requestOtp,
+  verifyOtp
 } from '../controllers/authController.js';
 
 const router = express.Router();
@@ -12,6 +14,8 @@ const router = express.Router();
 router.post('/login', login);
 router.post('/register', register);
 router.post('/forgot-password', forgotPassword);
+router.post('/otp/request', requestOtp);
+router.post('/otp/verify', verifyOtp);
 router.get('/profile/:phone', getProfile);
 router.put('/profile/:phone', updateProfile);
 

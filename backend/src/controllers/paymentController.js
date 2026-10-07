@@ -1,10 +1,26 @@
+import path from 'path';
+import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
 import generatePayload from 'promptpay-qr';
 import qrcode from 'qrcode';
+import axios from 'axios';
+
+// โหลด Environment Variables
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
+dotenv.config();
 
 // หน่วยความจำชั่วคราวสำหรับเก็บรหัส OTP พร้อมเวลาหมดอายุ (In-Memory Store)
 const otpStore = new Map();
 
-// 1. สร้าง PromptPay QR Code จริงตามมาตรฐาน EMVCo (สแกนติดจริง)
+// ฟังก์ชันทำความสะอาดเบอร์โทรศัพท์ (ตัดขีด เว้นวรรค ให้เหลือเฉพาะตัวเลข)
+const normalizePhone = (phone) => {
+  if (!phone) return '';
+  return String(phone).replace(/[^0-9]/g, '').trim();
+};
+
+// 1. สร้าง PromptPay QR Code จริงตามมาตรฐาน EMVCo
 export const generatePromptPayQR = async (req, res) => {
   try {
     const { amount } = req.body;
@@ -13,14 +29,9 @@ export const generatePromptPayQR = async (req, res) => {
       return res.status(400).json({ message: 'กรุณาระบุยอดเงินที่ถูกต้อง' });
     }
 
-    // หมายเลขพร้อมเพย์ร้านค้า 
-    // สามารถตั้งค่าผ่าน .env ได้ เช่น PROMPTPAY_ID=0898917104
     const promptPayId = process.env.PROMPTPAY_ID || '0898917104';
-
-    // แปลงข้อมูลเป็น Payload มาตรฐาน PromptPay
     const payload = generatePayload(promptPayId, { amount: Number(amount) });
 
-    // แปลง Payload เป็น Base64 Image
     const qrDataUrl = await qrcode.toDataURL(payload, {
       width: 320,
       margin: 1,
@@ -41,71 +52,91 @@ export const generatePromptPayQR = async (req, res) => {
   }
 };
 
-// 2. ขอรหัส OTP จาก Server จริง (ฟรี ไม่เสียเงิน)
+// 2. ขอรหัส OTP และยิง SMS ผ่าน Thaibulksms
 export const sendServerOtp = async (req, res) => {
   try {
     const { phone } = req.body;
-    if (!phone) {
-      return res.status(400).json({ message: 'กรุณาระบุเบอร์โทรศัพท์' });
+    const cleanPhone = normalizePhone(phone);
+
+    if (!cleanPhone || cleanPhone.length < 9) {
+      return res.status(400).json({ message: 'กรุณาระบุเบอร์โทรศัพท์ที่ถูกต้อง' });
     }
 
-    // สุ่มเลข OTP 6 หลัก
+    // สุ่มรหัส OTP 6 หลัก และตั้งเวลาหมดอายุ 5 นาที
     const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = Date.now() + 5 * 60 * 1000; // หมดอายุใน 5 นาที
+    const expiresAt = Date.now() + 5 * 60 * 1000;
 
-    // บันทึกลง Store
-    otpStore.set(phone.trim(), { code: generatedOtp, expiresAt });
+    otpStore.set(cleanPhone, { code: generatedOtp, expiresAt });
 
-    // ปริ้นต์ลง Terminal ชัดเจนสำหรับผู้พัฒนาและอาจารย์ตรวจสอบ
-    console.log('\n==================================================');
-    console.log(`[SMS OTP Simulation] ส่งไปยังเบอร์: ${phone}`);
-    console.log(`รหัส OTP คือ: >>> ${generatedOtp} <<< (ใช้ได้ภายใน 5 นาที)`);
-    console.log('==================================================\n');
+    const apiKey = (process.env.THAIBULKSMS_API_KEY || '').trim();
+    const apiSecret = (process.env.THAIBULKSMS_API_SECRET || '').trim();
+
+    if (apiKey && apiSecret) {
+      const authHeader = Buffer.from(`${apiKey}:${apiSecret}`).toString('base64');
+
+      const smsPayload = {
+        msisdn: cleanPhone,
+        message: `[N&N Laundromat] รหัส OTP ของคุณคือ ${generatedOtp} (ใช้งานได้ใน 5 นาที)`
+      };
+
+      await axios.post('https://api-v2.thaibulksms.com/sms', smsPayload, {
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Basic ${authHeader}`
+        }
+      });
+    } else {
+      console.log(`[SMS Simulation] เบอร์: ${cleanPhone} | รหัส OTP: ${generatedOtp}`);
+    }
 
     res.status(200).json({
       success: true,
-      message: 'ส่งรหัส OTP เรียบร้อยแล้ว',
-      // ส่ง otp กลับไปด้วยในโหมด Dev เพื่อให้หน้าเว็บนำไปโชว์ใน Push Alert ได้ทันที
-      devOtp: generatedOtp
+      message: 'ส่งรหัส OTP ไปยังหมายเลขโทรศัพท์ของคุณแล้ว'
     });
   } catch (error) {
-    console.error('Error sending OTP:', error);
-    res.status(500).json({ message: 'เกิดข้อผิดพลาดในการส่ง OTP' });
+    console.error('Error sending SMS OTP:', error.response?.data || error.message);
+    res.status(500).json({ 
+      message: 'เกิดข้อผิดพลาดในการส่งข้อความ SMS',
+      detail: error.response?.data?.error?.message || error.message
+    });
   }
 };
 
-// 3. ตรวจสอบรหัส OTP กับ Server จริง
+// 3. ตรวจสอบรหัส OTP
 export const verifyServerOtp = async (req, res) => {
   try {
     const { phone, otp } = req.body;
-    if (!phone || !otp) {
-      return res.status(400).json({ message: 'ข้อมูลไม่ครบถ้วน' });
+    const cleanPhone = normalizePhone(phone);
+
+    if (!cleanPhone || !otp) {
+      return res.status(400).json({ message: 'กรุณากรอกข้อมูลให้ครบถ้วน' });
     }
 
-    const record = otpStore.get(phone.trim());
+    const record = otpStore.get(cleanPhone);
 
     if (!record) {
-      return res.status(400).json({ message: 'ไม่พบคำขอ OTP หรือรหัสหมดอายุแล้ว กรุณากดขอใหม่' });
+      return res.status(400).json({ message: 'ไม่พบคำขอ OTP หรือรหัสหมดอายุแล้ว กรุณากดขอรหัสใหม่' });
     }
 
     if (Date.now() > record.expiresAt) {
-      otpStore.delete(phone.trim());
-      return res.status(400).json({ message: 'รหัส OTP หมดอายุแล้ว sกรุณาขอใหม่' });
+      otpStore.delete(cleanPhone);
+      return res.status(400).json({ message: 'รหัส OTP หมดอายุแล้ว กรุณากดขอรหัสใหม่' });
     }
 
-    if (record.code !== otp.trim() && otp.trim() !== '123456') {
-      return res.status(400).json({ message: 'รหัส OTP ไม่ถูกต้อง' });
+    if (record.code !== String(otp).trim()) {
+      return res.status(400).json({ message: 'รหัส OTP ไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง' });
     }
 
-    // ผ่านแล้วลบออกจากคลังทันที ป้องกันการใช้ซ้ำ
-    otpStore.delete(phone.trim());
+    // เมื่อยืนยันถูกต้อง ให้ลบออกจาก Memory เพื่อป้องกันการใช้ซ้ำ
+    otpStore.delete(cleanPhone);
 
     res.status(200).json({
       success: true,
-      message: 'ยืนยัน OTP ถูกต้องเรียบร้อย'
+      message: 'ยืนยันรหัส OTP ถูกต้องเรียบร้อย'
     });
   } catch (error) {
     console.error('Error verifying OTP:', error);
     res.status(500).json({ message: 'เกิดข้อผิดพลาดในการตรวจสอบ OTP' });
   }
-}
+};
