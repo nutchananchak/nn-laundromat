@@ -20,25 +20,70 @@ export default function NewOrderPage() {
   const navigate = useNavigate();
   const location = useLocation() || {};
   const reorderData = location.state || {};
-  const { currentAddress, userProfile, addresses, setSelectedAddressId } = useApp();
+  const { currentAddress, userProfile, addresses, setSelectedAddressId } = useApp ? useApp() : {};
 
   const cameraInputRef = useRef(null);
   const galleryInputRef = useRef(null);
 
   const serviceType = reorderData.service || location.state?.service || 'wash_dry_fold';
-  
   const [showAddressModal, setShowAddressModal] = useState(false);
   const displayAddress = currentAddress ? `${currentAddress.title} - ${currentAddress.detail}` : (reorderData.address || null);
 
-  const packages = serviceType === 'bedding' ? [
-    { id: '3.5ft', name: 'ชุดเครื่องนอน 3.5 ฟุต', price: 200, desc: 'ประกอบด้วย 5 ชิ้น ผ้านวมและผ้าปู 3.5 ฟุตอย่างละ 1 ผืน ปอกหมอน 1 ชิ้น ปอกหมอนข้าง 2 ชิ้น' },
-    { id: '5ft', name: 'ชุดเครื่องนอน 5 ฟุต', price: 230, desc: 'ประกอบด้วย 5 ชิ้น ผ้านวมและผ้าปู 5 ฟุตอย่างละ 1 ผืน ปอกหมอน 1 ชิ้น ปอกหมอนข้าง 2 ชิ้น' },
-    { id: '6ft', name: 'ชุดเครื่องนอน 6 ฟุต', price: 250, desc: 'ประกอบด้วย 5 ชิ้น ผ้านวมและผ้าปู 6 ฟุตอย่างละ 1 ผืน ปอกหมอน 1 ชิ้น ปอกหมอนข้าง 2 ชิ้น' },
-  ] : [
-    { id: 'S', name: 'ตะกร้า S', price: 160, desc: 'ผ้าไม่เกิน 15 ชิ้น' },
-    { id: 'M', name: 'ตะกร้า M', price: 180, desc: 'ผ้าไม่เกิน 35 ชิ้น' },
-    { id: 'L', name: 'ตะกร้า L', price: 240, desc: 'ผ้าไม่เกิน 65 ชิ้น' },
-  ];
+  // ================= 1. ดึง Dynamic Pricing ที่แอดมินบันทึกไว้ =================
+  const dynamicPricing = useMemo(() => {
+    try {
+      const saved = localStorage.getItem('storePricing');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
+  }, []);
+
+  // แพ็กเกจหลัก (ดึงราคาที่แอดมินแก้ไขแล้วแบบอัตโนมัติ)
+  const packages = useMemo(() => {
+    if (serviceType === 'bedding') {
+      const savedBedding = dynamicPricing?.bedding || [];
+      return [
+        { id: '3.5ft', name: 'ชุดเครื่องนอน 3.5 ฟุต', price: savedBedding.find(p => p.id === '3.5ft')?.price ?? 200, desc: 'ประกอบด้วย 5 ชิ้น ผ้านวมและผ้าปู 3.5 ฟุตอย่างละ 1 ผืน ปอกหมอน 1 ชิ้น ปอกหมอนข้าง 2 ชิ้น' },
+        { id: '5ft', name: 'ชุดเครื่องนอน 5 ฟุต', price: savedBedding.find(p => p.id === '5ft')?.price ?? 230, desc: 'ประกอบด้วย 5 ชิ้น ผ้านวมและผ้าปู 5 ฟุตอย่างละ 1 ผืน ปอกหมอน 1 ชิ้น ปอกหมอนข้าง 2 ชิ้น' },
+        { id: '6ft', name: 'ชุดเครื่องนอน 6 ฟุต', price: savedBedding.find(p => p.id === '6ft')?.price ?? 250, desc: 'ประกอบด้วย 5 ชิ้น ผ้านวมและผ้าปู 6 ฟุตอย่างละ 1 ผืน ปอกหมอน 1 ชิ้น ปอกหมอนข้าง 2 ชิ้น' },
+      ];
+    }
+    const savedWashDry = dynamicPricing?.washDry || [];
+    return [
+      { id: 'S', name: 'ตะกร้า S', price: savedWashDry.find(p => p.id === 'S')?.price ?? 160, desc: 'ผ้าไม่เกิน 15 ชิ้น' },
+      { id: 'M', name: 'ตะกร้า M', price: savedWashDry.find(p => p.id === 'M')?.price ?? 180, desc: 'ผ้าไม่เกิน 35 ชิ้น' },
+      { id: 'L', name: 'ตะกร้า L', price: savedWashDry.find(p => p.id === 'L')?.price ?? 240, desc: 'ผ้าไม่เกิน 65 ชิ้น' },
+    ];
+  }, [serviceType, dynamicPricing]);
+
+  // ความต้องการพิเศษ (ดึงราคาที่แอดมินแก้ไขแล้วแบบอัตโนมัติ)
+  const currentSpecialOptions = useMemo(() => {
+    if (serviceType === 'bedding') {
+      return dynamicPricing?.specialBedding || [
+        { id: 'bed_sheet', name: 'ผ้าปู', price: 50, unit: 'ชิ้น' },
+        { id: 'pillow_case', name: 'ปลอกหมอน', price: 10, unit: 'ชิ้น' },
+        { id: 'bolster_case', name: 'ปลอกหมอนข้าง', price: 10, unit: 'ชิ้น' },
+        { id: 'duvet_3_5', name: 'ผ้านวม 3.5 ฟุต', price: 130, unit: 'ผืน' },
+        { id: 'duvet_5', name: 'ผ้านวม 5 ฟุต', price: 160, unit: 'ผืน' },
+        { id: 'duvet_6', name: 'ผ้านวม 6 ฟุต', price: 180, unit: 'ผืน' },
+      ];
+    }
+    return dynamicPricing?.specialWashDry || [
+      { id: 'silk', name: 'ผ้าไหม', price: 120, unit: 'ตัว' },
+      { id: 'leather', name: 'เสื้อหนัง', price: 150, unit: 'ตัว' },
+      { id: 'fur', name: 'ขนสัตว์', price: 150, unit: 'ตัว' },
+      { id: 'evening_dress', name: 'ชุดราตรี', price: 150, unit: 'ตัว' },
+      { id: 'suit_top', name: 'สูท (เฉพาะเสื้อ)', price: 120, unit: 'ตัว' },
+      { id: 'suit_full', name: 'สูท (เสื้อและกางเกง)', price: 180, unit: 'ชุด' },
+      { id: 'sequin', name: 'เสื้อผ้าติดเลื่อม/เพชรประดับ', price: 120, unit: 'ตัว' },
+      { id: 'brandname', name: 'เสื้อผ้าแบรนด์เนม', price: 100, unit: 'ตัว' },
+      { id: 'dry_clean_only', name: 'เสื้อผ้าที่มีคำแนะนำ "ซักแห้งเท่านั้น"', price: 120, unit: 'ตัว' },
+    ];
+  }, [serviceType, dynamicPricing]);
+
+  // ราคาถุงพลาสติกจากแอดมิน
+  const bagUnitPrice = dynamicPricing?.extraBag ?? 5;
 
   const initialPkgId = serviceType === 'bedding'
     ? (reorderData.packageSize?.includes('3.5') ? '3.5ft' : reorderData.packageSize?.includes('5') ? '5ft' : reorderData.packageSize?.includes('6') ? '6ft' : '')
@@ -123,28 +168,6 @@ export default function NewOrderPage() {
     }
   };
 
-  const washDrySpecialOptions = [
-    { id: 'silk', name: 'ผ้าไหม', price: 120, unit: 'ตัว' },
-    { id: 'leather', name: 'เสื้อหนัง', price: 150, unit: 'ตัว' },
-    { id: 'fur', name: 'ขนสัตว์', price: 150, unit: 'ตัว' },
-    { id: 'evening_dress', name: 'ชุดราตรี', price: 150, unit: 'ตัว' },
-    { id: 'suit_top', name: 'สูท (เฉพาะเสื้อ)', price: 120, unit: 'ตัว' },
-    { id: 'suit_full', name: 'สูท (เสื้อและกางเกง)', price: 180, unit: 'ชุด' },
-    { id: 'sequin', name: 'เสื้อผ้าติดเลื่อม/เพชรประดับ', price: 120, unit: 'ตัว' },
-    { id: 'brandname', name: 'เสื้อผ้าแบรนด์เนม', price: 100, unit: 'ตัว' },
-    { id: 'dry_clean_only', name: 'เสื้อผ้าที่มีคำแนะนำ "ซักแห้งเท่านั้น"', price: 120, unit: 'ตัว' },
-  ];
-
-  const beddingSpecialOptions = [
-    { id: 'bed_sheet', name: 'ผ้าปู', price: 50, unit: 'ชิ้น' },
-    { id: 'pillow_case', name: 'ปลอกหมอน', price: 10, unit: 'ชิ้น' },
-    { id: 'bolster_case', name: 'ปลอกหมอนข้าง', price: 10, unit: 'ชิ้น' },
-    { id: 'duvet_3_5', name: 'ผ้านวม 3.5 ฟุต', price: 130, unit: 'ผืน' },
-    { id: 'duvet_5', name: 'ผ้านวม 5 ฟุต', price: 160, unit: 'ผืน' },
-    { id: 'duvet_6', name: 'ผ้านวม 6 ฟุต', price: 180, unit: 'ผืน' },
-  ];
-
-  const currentSpecialOptions = serviceType === 'bedding' ? beddingSpecialOptions : washDrySpecialOptions;
   const [specialItemCounts, setSpecialItemCounts] = useState({});
 
   const handleUpdateCount = (id, delta) => {
@@ -160,7 +183,6 @@ export default function NewOrderPage() {
     });
   };
 
-  // แปลงรูปเป็น Base64 เพื่อส่งต่อข้ามหน้าและบันทึกลง Database ได้อย่างสมบูรณ์
   const handleImageFile = (e) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -179,7 +201,7 @@ export default function NewOrderPage() {
     return sum + (item ? item.price * count : 0);
   }, 0);
 
-  const plasticBagPrice = plasticBagCount * 5;
+  const plasticBagPrice = plasticBagCount * bagUnitPrice;
   const totalPrice = basePrice + specialTotal + plasticBagPrice;
 
   const selectedSpecialItems = Object.entries(specialItemCounts)
@@ -333,7 +355,7 @@ export default function NewOrderPage() {
             </div>
           </div>
 
-          {/* 2. เลือกแพ็กเกจ */}
+          {/* 2. เลือกแพ็กเกจหลัก */}
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="block text-sm font-bold text-gray-900">
@@ -377,7 +399,7 @@ export default function NewOrderPage() {
             </div>
           </div>
 
-          {/* 3. ความต้องการพิเศษ */}
+          {/* 3. ความต้องการพิเศษ (แยกชิ้น) */}
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="block text-sm font-bold text-gray-900">
@@ -452,7 +474,7 @@ export default function NewOrderPage() {
               <div className="flex items-center gap-3 min-w-0">
                 <div>
                   <h4 className="font-bold text-xs text-gray-900">ถุงพลาสติกใส่ผ้า</h4>
-                  <p className="text-[11px] text-gray-500 mt-0.5">ราคา 5 บาท / 1 ใบ</p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">ราคา {bagUnitPrice} บาท / 1 ใบ</p>
                 </div>
               </div>
 
@@ -629,7 +651,7 @@ export default function NewOrderPage() {
             </div>
           </div>
 
-          {/* 8. ยอมรับเงื่อนไขการใช้บริการ */}
+          {/* 8. ยอมรับเงื่อนไข */}
           <div 
             onClick={() => setAgreed(!agreed)}
             className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center gap-3.5 shadow-xs ${
@@ -657,7 +679,7 @@ export default function NewOrderPage() {
 
         </div>
 
-        {/* ส่วนสรุปราคาและปุ่มยืนยัน */}
+        {/* บาร์สรุปราคาและปุ่มยืนยัน */}
         <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-6 py-3.5 shadow-[0_-6px_20px_rgba(0,0,0,0.08)] flex flex-col gap-2.5 z-30">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-gray-600">
@@ -665,7 +687,7 @@ export default function NewOrderPage() {
               <span className="text-xs font-semibold">ยอดรวมทั้งสิ้น</span>
             </div>
             <div className="flex items-baseline gap-1">
-              <span className="font-bold text-xl text-[#1d61f2]">{totalPrice}</span>
+              <span className="font-bold text-xl text-[#1d61f2]">{totalPrice.toLocaleString()}</span>
               <span className="text-xs font-bold text-gray-500">บาท</span>
             </div>
           </div>
@@ -679,7 +701,7 @@ export default function NewOrderPage() {
           </button>
         </div>
 
-        {/* Modal เลือกที่อยู่จัดส่ง */}
+        {/* Modal เลือกที่อยู่ */}
         {showAddressModal && (
           <div className="absolute inset-0 bg-black/60 z-50 flex items-end justify-center backdrop-blur-xs">
             <div className="bg-white w-full max-w-[430px] rounded-t-3xl p-5 shadow-2xl flex flex-col gap-4 animate-in slide-in-from-bottom duration-200">
@@ -745,7 +767,7 @@ export default function NewOrderPage() {
           </div>
         )}
 
-        {/* Modal แสดงเงื่อนไข */}
+        {/* Modal ข้อตกลง */}
         {showTermsModal && (
           <div className="absolute inset-0 bg-black/50 z-50 flex items-center justify-center p-6 backdrop-blur-sm">
             <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl flex flex-col max-h-[80vh]">
