@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   MapPin, 
@@ -25,7 +25,8 @@ import {
   Star, 
   Receipt, 
   Ban, 
-  Bell 
+  Bell,
+  Crown
 } from 'lucide-react';
 import BottomNav from '../../components/layout/BottomNav';
 import { useApp } from '../../context/AppContext';
@@ -75,14 +76,13 @@ export default function HomePage() {
 
   const currentUserId = String(userProfile?.phone || userProfile?.id || userProfile?.email || '').trim();
 
-  // 1. ดึงข้อมูลออเดอร์ล่าสุดจาก MySQL พร้อมคงสถานะ viewedCompleted ไว้เสมอ
+  // 1. ดึงข้อมูลออเดอร์ล่าสุดจาก MySQL
   useEffect(() => {
     const loadRealtimeOrders = async () => {
       try {
         const liveOrders = await fetchOrders();
         const savedViewedIds = JSON.parse(localStorage.getItem('viewed_completed_orders') || '[]');
         
-        // ผสานค่า viewedCompleted จาก localStorage เข้ากับข้อมูลสดจากฐานข้อมูล
         const mergedOrders = (liveOrders || []).map(order => ({
           ...order,
           viewedCompleted: savedViewedIds.includes(String(order.id)) || Boolean(order.viewedCompleted)
@@ -100,7 +100,7 @@ export default function HomePage() {
     loadRealtimeOrders();
   }, []);
 
-  // 2. ดึงสถานะร้าน วันหยุด และเช็กสถานะการแจ้งเตือนเฉพาะของ User ปัจจุบันแบบ Realtime
+  // 2. ดึงสถานะร้าน วันหยุด และเช็กสถานะการแจ้งเตือน
   useEffect(() => {
     const savedStoreStatus = localStorage.getItem('storeServiceStatus');
     if (savedStoreStatus !== null) {
@@ -130,7 +130,6 @@ export default function HomePage() {
           return isSystemAnnouncement || owner === currentUserId;
         });
 
-        // ตรวจสอบว่ามีรายการที่ยังไม่อ่านจริงหรือไม่
         const unreadExists = myNotices.some(n => n.isRead === false || n.isRead === 'false' || !n.isRead);
         setHasUnreadNotices(unreadExists);
       } catch (e) {
@@ -140,7 +139,6 @@ export default function HomePage() {
 
     checkUnreadNotices();
 
-    // ดักฟัง Event เมื่อกลับมาจากหน้า Notification หรือมีการสลับแท็บ
     window.addEventListener('storage', checkUnreadNotices);
     window.addEventListener('focus', checkUnreadNotices);
 
@@ -168,20 +166,30 @@ export default function HomePage() {
   };
 
   // แยก Order ตาม User
-  const userOrders = (orders || []).filter(o => {
-    const orderOwner = String(o.customerPhone || o.userPhone || o.userId || o.customerId || '').trim();
-    return currentUserId && orderOwner === currentUserId;
-  });
+  const userOrders = useMemo(() => {
+    return (orders || []).filter(o => {
+      const orderOwner = String(o.customerPhone || o.userPhone || o.userId || o.customerId || '').trim();
+      return currentUserId && orderOwner === currentUserId;
+    });
+  }, [orders, currentUserId]);
 
-  // ค้นหาออเดอร์ที่กำลังดำเนินอยู่ หรือสำเร็จแล้วแต่ยังไม่เคยกดเปิดดูใบเสร็จ
+  // คำนวณจำนวนออเดอร์ที่ซักสำเร็จแล้วของ User เพื่อสะสมสแตมป์
+  const completedOrderCount = useMemo(() => {
+    return userOrders.filter(o => {
+      const step = Number(o.statusStep) || 1;
+      return (step >= 7 || o.status === 'completed' || o.isCompleted) && !o.isCancelled && o.status !== 'cancelled';
+    }).length;
+  }, [userOrders]);
+
+  const hasHistory = completedOrderCount > 0;
+  const currentStamps = completedOrderCount % 10;
+  const hasFreeReward = hasHistory && currentStamps === 0;
+
+  // ค้นหาออเดอร์ที่กำลังดำเนินอยู่
   const activeOrder = userOrders.find(o => {
     if (o.isCancelled || o.status === 'cancelled') return false;
     const step = Number(o.statusStep) || 1;
-    
-    // หากอยู่ระหว่างดำเนินการ (Step 1 ถึง 6)
     if (step >= 1 && step < 7 && !o.isCompleted) return true;
-    
-    // หากสำเร็จแล้ว (Step 7) ต้องเช็กว่าเคยกดดูใบเสร็จแล้วหรือไม่ (ถ้าดูแล้วจะไม่แสดงการ์ดติดตาม)
     if (step >= 7) {
       const isViewed = viewedCompletedIds.includes(String(o.id)) || o.viewedCompleted;
       return !isViewed;
@@ -192,19 +200,20 @@ export default function HomePage() {
   const hasOngoingOrder = Boolean(activeOrder);
   const isSlipRejected = Boolean(activeOrder && activeOrder.paymentRejected);
 
-  // เช็กว่าออเดอร์อยู่ในขั้นตอนที่ยังสามารถยกเลิกได้หรือไม่
   const currentStepNum = Number(activeOrder?.statusStep) || 1;
   const canCancelOrder = hasOngoingOrder && currentStepNum < 3;
+
+  const totalBanners = hasHistory ? 4 : 3;
 
   useEffect(() => {
     if (hasOngoingOrder) return;
 
     const timer = setInterval(() => {
-      setBannerIndex((prev) => (prev + 1) % 3);
-    }, 30000);
+      setBannerIndex((prev) => (prev + 1) % totalBanners);
+    }, 12000);
 
     return () => clearInterval(timer);
-  }, [hasOngoingOrder]);
+  }, [hasOngoingOrder, totalBanners]);
 
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
@@ -229,24 +238,19 @@ export default function HomePage() {
     { step: 7, label: 'สำเร็จ', icon: CheckCircle2 },
   ];
 
-  // เมื่อกดดูใบเสร็จ / รายละเอียดออเดอร์: บันทึกว่าดูแล้ว เพื่อให้หน้าต่างติดตามสถานะหายไปอย่างถาวร
   const handleViewOrderStatus = () => {
     if (!activeOrder) return;
 
     if (Number(activeOrder.statusStep) >= 7) {
       const orderIdStr = String(activeOrder.id);
-      
-      // บันทึก ID ลงใน viewed_completed_orders ใน localStorage ทันที
       const updatedViewed = Array.from(new Set([...viewedCompletedIds, orderIdStr]));
       setViewedCompletedIds(updatedViewed);
       localStorage.setItem('viewed_completed_orders', JSON.stringify(updatedViewed));
 
-      // อัปเดตใน AppContext State
       if (setOrders) {
         setOrders(prev => prev.map(o => String(o.id) === orderIdStr ? { ...o, viewedCompleted: true } : o));
       }
 
-      // อัปเดตใน orders cache ใน localStorage
       try {
         const cachedOrders = JSON.parse(localStorage.getItem('orders') || '[]');
         const updatedCache = cachedOrders.map(o => String(o.id) === orderIdStr ? { ...o, viewedCompleted: true } : o);
@@ -270,7 +274,6 @@ export default function HomePage() {
     }
   };
 
-  // กดยกเลิกออเดอร์ -> บันทึกลง MySQL จริงทันที
   const handleConfirmCancelOrder = async () => {
     if (!activeOrder) return;
 
@@ -339,7 +342,7 @@ export default function HomePage() {
     }
   };
 
-  const handleBookService = () => {
+  const handleBookService = (useReward = false) => {
     if (!isStoreOpen) {
       alert('ขออภัย ขณะนี้ระบบปิดให้บริการชั่วคราว ไม่สามารถสร้างคำสั่งซื้อได้');
       return;
@@ -357,7 +360,8 @@ export default function HomePage() {
     navigate('/order/new', {
       state: {
         service: selectedService,
-        address: currentAddress?.detail
+        address: currentAddress?.detail,
+        applyRewardDiscount: useReward
       }
     });
   };
@@ -643,10 +647,89 @@ export default function HomePage() {
               </div>
             </div>
           ) : (
-            /* Smart Banner */
+            /* Smart Banner (รวมสไลด์สะสมแต้มเสื้อ/ดาว ดีไซน์ใหม่โปร่งสบายตา) */
             <div className="bg-white p-4.5 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between min-h-[195px] transition-all">
-              {bannerIndex === 0 && (
-                <div className="w-full">
+              
+              {/* สไลด์ 0: การ์ดสะสมแต้มรูปเสื้อ & ดาว (แสดงหน้าแรกเมื่อเคยซักแล้ว) */}
+              {hasHistory && bannerIndex === 0 && (
+                <div className="w-full flex flex-col justify-between h-full animate-in fade-in duration-300">
+                  {/* หัวข้อสไลด์ */}
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-xl bg-blue-50 text-[#1d61f2] flex items-center justify-center shrink-0">
+                        <Shirt size={16} />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-xs text-slate-900 leading-tight">N&amp;N Laundromat Star Pass</h3>
+                        <span className="text-[10px] text-slate-400 font-medium">สะสมครบ 10 ครั้ง ซักฟรีทันที!</span>
+                      </div>
+                    </div>
+                    <span className="text-xs font-black text-[#1d61f2] bg-blue-50 border border-blue-100 px-2.5 py-0.5 rounded-xl">
+                      {currentStamps}/10
+                    </span>
+                  </div>
+
+                  {/* แถบหลอดสะสมดาวและรูปเสื้อ (ดีไซน์กว้าง โปร่งตา ไม่โดนบีบ) */}
+                  <div className="py-2.5 px-1">
+                    <div className="grid grid-cols-10 gap-1.5">
+                      {Array.from({ length: 10 }).map((_, index) => {
+                        const isStamped = currentStamps > index;
+                        const isRewardSlot = index === 9;
+                        const canClaim = isRewardSlot && (hasFreeReward || isStamped);
+
+                        return (
+                          <div key={index} className="flex flex-col items-center gap-1">
+                            <div 
+                              className={`w-full aspect-square rounded-xl flex items-center justify-center transition-all ${
+                                canClaim
+                                  ? 'bg-amber-400 text-white shadow-xs scale-105 ring-2 ring-amber-200'
+                                  : isRewardSlot
+                                  ? 'bg-amber-50 text-amber-500 border border-dashed border-amber-300'
+                                  : isStamped
+                                  ? 'bg-[#1d61f2] text-white shadow-2xs'
+                                  : 'bg-slate-50 text-slate-300 border border-slate-200/80'
+                              }`}
+                            >
+                              {isRewardSlot ? (
+                                <Star size={14} className={canClaim ? 'fill-white text-white' : 'fill-amber-400 text-amber-400'} />
+                              ) : (
+                                <Shirt size={13} className={isStamped ? 'fill-white text-white' : ''} />
+                              )}
+                            </div>
+                            <span className={`text-[8.5px] font-bold leading-none ${
+                              isRewardSlot ? 'text-amber-600 font-extrabold' : isStamped ? 'text-[#1d61f2]' : 'text-slate-400'
+                            }`}>
+                              {isRewardSlot ? 'ฟรี' : index + 1}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* คำอธิบายสิทธิ์ด้านล่าง */}
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1.5 border-t border-slate-100">
+                    <span className="truncate pr-1">
+                      {hasFreeReward 
+                        ? 'คุณมีสิทธิ์ซักฟรี 1 ครั้ง พร้อมใช้งานแล้ว!' 
+                        : `ซักอีกเพียง ${10 - currentStamps} ครั้ง เพื่อรับสิทธิ์ซักฟรี`}
+                    </span>
+                    {hasFreeReward && (
+                      <button
+                        type="button"
+                        onClick={() => handleBookService(true)}
+                        className="text-[#1d61f2] font-bold underline cursor-pointer hover:text-blue-700 shrink-0"
+                      >
+                        กดใช้สิทธิ์
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* สไลด์: ส่งผ้าง่ายๆ ใน 3 ขั้นตอน */}
+              {((!hasHistory && bannerIndex === 0) || (hasHistory && bannerIndex === 1)) && (
+                <div className="w-full animate-in fade-in duration-300">
                   <div className="flex items-center gap-2.5 mb-3">
                     <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#1d61f2] flex items-center justify-center shrink-0">
                       <Sparkles size={18} />
@@ -685,8 +768,9 @@ export default function HomePage() {
                 </div>
               )}
 
-              {bannerIndex === 1 && (
-                <div className="w-full">
+              {/* สไลด์: มาตรฐานความสะอาด */}
+              {((!hasHistory && bannerIndex === 1) || (hasHistory && bannerIndex === 2)) && (
+                <div className="w-full animate-in fade-in duration-300">
                   <div className="flex items-center gap-2.5 mb-3">
                     <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#1d61f2] flex items-center justify-center shrink-0">
                       <ShieldCheck size={18} />
@@ -719,8 +803,9 @@ export default function HomePage() {
                 </div>
               )}
 
-              {bannerIndex === 2 && (
-                <div className="w-full">
+              {/* สไลด์: Same-Day Delivery */}
+              {((!hasHistory && bannerIndex === 2) || (hasHistory && bannerIndex === 3)) && (
+                <div className="w-full animate-in fade-in duration-300">
                   <div className="flex items-center gap-2.5 mb-3">
                     <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#1d61f2] flex items-center justify-center shrink-0">
                       <Truck size={18} />
@@ -748,8 +833,9 @@ export default function HomePage() {
                 </div>
               )}
 
-              <div className="flex items-center justify-center gap-1.5 pt-2.5 mt-2 border-t border-slate-100">
-                {[0, 1, 2].map((idx) => (
+              {/* จุดเลื่อนสไลด์ (Dots Indicators) */}
+              <div className="flex items-center justify-center gap-1.5 pt-2 mt-1 border-t border-slate-100">
+                {Array.from({ length: totalBanners }).map((_, idx) => (
                   <button
                     key={idx}
                     type="button"
@@ -811,7 +897,7 @@ export default function HomePage() {
           {/* ปุ่มจองบริการ */}
           <button
             type="button"
-            onClick={handleBookService}
+            onClick={() => handleBookService(false)}
             disabled={!canBook}
             className={`w-full py-4 rounded-2xl font-bold text-sm shadow-md transition flex items-center justify-center gap-2 cursor-pointer ${
               canBook
