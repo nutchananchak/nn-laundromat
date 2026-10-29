@@ -571,13 +571,15 @@ const DashboardPage = () => {
     window.open(mapsUrl, '_blank', 'noopener,noreferrer');
   };
 
-  // ================= คำนวณรายได้ (รวมรายปี) =================
+  // ================= คำนวณรายรับ (หักลบออเดอร์ยกเลิก & คืนเงินอย่างถูกต้อง) =================
   const { 
     dailyRevenue, 
     weeklyRevenue, 
     selectedMonthRevenue, 
     yearlyRevenue,
-    totalRevenue, 
+    totalGrossRevenue,
+    totalRefunds,
+    totalNetRevenue, 
     revenueOrdersGroupedByDate, 
     chartData 
   } = useMemo(() => {
@@ -588,17 +590,12 @@ const DashboardPage = () => {
     const chosenMonthObj = thaiMonths.find(m => m.value === Number(selectedMonth)) || thaiMonths[now.getMonth()];
     const chosenMonthShort = chosenMonthObj.short;
 
-    const validOrders = (orders || []).filter(o => 
-      !o.paymentRejected && 
-      !o.isCancelled && 
-      (o.paymentVerified === true || Number(o.statusStep) >= 3 || Number(o.statusStep) === 7 || o.status === 'completed')
-    );
-
     let daily = 0;
     let weekly = 0;
     let chosenMonthTotal = 0;
     let yearly = 0;
-    let total = 0;
+    let grossTotal = 0;
+    let refundTotal = 0;
 
     const hourlyMap = {
       '08:00': 0, '10:00': 0, '12:00': 0, '14:00': 0, '16:00': 0, '18:00': 0, '20:00': 0, '22:00': 0
@@ -636,9 +633,23 @@ const DashboardPage = () => {
 
     const groupedOrdersMap = {};
 
-    validOrders.forEach((o) => {
+    (orders || []).forEach((o) => {
       const amount = Number(o.totalPrice || o.price || 0);
-      total += amount;
+      const isCancelled = o.isCancelled || o.status === 'cancelled';
+      const isPaid = o.paymentVerified === true || Number(o.statusStep) >= 3 || Number(o.statusStep) === 7 || o.status === 'completed';
+
+      // 1. จัดการออเดอร์ที่ถูกยกเลิก: ไม่นำไปบวกเป็นรายได้ และคิดเข้ายอดยกเลิก/คืนเงิน
+      if (isCancelled) {
+        if (isPaid || o.paymentSlip || o.cancelReason?.includes('ฉุกเฉิน')) {
+          refundTotal += amount;
+        }
+        return; // ตัดออก ไม่บวกเป็นรายรับใดๆ ทั้งสิ้น
+      }
+
+      // 2. ถ้ายังไม่ชำระเงิน หรือสลิปโดนปฏิเสธ จะไม่นับเป็นรายได้
+      if (!isPaid || o.paymentRejected) return;
+
+      grossTotal += amount;
 
       const fullDateStr = String(o.deliveredAt || o.verifiedAt || o.createdAt || '').replace(/[\s\u00A0\u202F]+/g, ' ');
 
@@ -703,7 +714,9 @@ const DashboardPage = () => {
       weeklyRevenue: weekly,
       selectedMonthRevenue: chosenMonthTotal,
       yearlyRevenue: yearly,
-      totalRevenue: total,
+      totalGrossRevenue: grossTotal,
+      totalRefunds: refundTotal,
+      totalNetRevenue: Math.max(0, grossTotal),
       revenueOrdersGroupedByDate: Object.values(groupedOrdersMap),
       chartData: {
         daily: Object.entries(hourlyMap).map(([label, val]) => ({ label, val })),
@@ -1562,7 +1575,6 @@ const DashboardPage = () => {
                                   >
                                     อนุมัติ
                                   </button>
-                                  {/* ปุ่มยกเลิกฉุกเฉิน */}
                                   <button
                                     type="button"
                                     onClick={() => setEmergencyCancelModal({ isOpen: true, orderId: order.id, reason: 'ซอยบ้านลูกค้าน้ำท่วม/ถนนชำรุด ไรเดอร์ไม่สามารถเข้าพื้นที่ได้' })}
@@ -1627,26 +1639,32 @@ const DashboardPage = () => {
                   </div>
 
                   {riderFilterPeriod === 'monthly' && (
-                    <select
-                      value={riderFilterMonth}
-                      onChange={(e) => setRiderFilterMonth(Number(e.target.value))}
-                      className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-700 outline-none cursor-pointer"
-                    >
-                      {thaiMonths.map(m => (
-                        <option key={m.value} value={m.value}>เดือน{m.label}</option>
-                      ))}
-                    </select>
+                    <div className="relative inline-flex items-center">
+                      <select
+                        value={riderFilterMonth}
+                        onChange={(e) => setRiderFilterMonth(Number(e.target.value))}
+                        className="appearance-none bg-white border border-slate-200 hover:border-[#1d61f2] focus:border-[#1d61f2] rounded-2xl pl-3.5 pr-8 py-2 text-xs font-bold text-slate-700 outline-none cursor-pointer transition shadow-2xs"
+                      >
+                        {thaiMonths.map(m => (
+                          <option key={m.value} value={m.value}>เดือน{m.label}</option>
+                        ))}
+                      </select>
+                      <ChevronDown size={14} className="text-slate-400 absolute right-2.5 pointer-events-none" />
+                    </div>
                   )}
 
                   {(riderFilterPeriod === 'monthly' || riderFilterPeriod === 'yearly') && (
-                    <select
-                      value={riderFilterYear}
-                      onChange={(e) => setRiderFilterYear(Number(e.target.value))}
-                      className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-700 outline-none cursor-pointer"
-                    >
-                      <option value={2026}>ปี พ.ศ. 2569 (2026)</option>
-                      <option value={2027}>ปี พ.ศ. 2570 (2027)</option>
-                    </select>
+                    <div className="relative inline-flex items-center">
+                      <select
+                        value={riderFilterYear}
+                        onChange={(e) => setRiderFilterYear(Number(e.target.value))}
+                        className="appearance-none bg-white border border-slate-200 hover:border-[#1d61f2] focus:border-[#1d61f2] rounded-2xl pl-3.5 pr-8 py-2 text-xs font-bold text-slate-700 outline-none cursor-pointer transition shadow-2xs"
+                      >
+                        <option value={2026}>ปี พ.ศ. 2569 (2026)</option>
+                        <option value={2027}>ปี พ.ศ. 2570 (2027)</option>
+                      </select>
+                      <ChevronDown size={14} className="text-slate-400 absolute right-2.5 pointer-events-none" />
+                    </div>
                   )}
 
                   <button
@@ -1898,16 +1916,19 @@ const DashboardPage = () => {
                     ตรวจสอบว่าลูกค้าแต่ละท่านใช้บริการกี่ครั้งในรอบปี เพื่อนำไปจัดโปรโมชันและมอบสิทธิประโยชน์
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2.5">
                   <span className="text-xs font-bold text-slate-500">เลือกปี:</span>
-                  <select
-                    value={selectedYear}
-                    onChange={(e) => setSelectedYear(Number(e.target.value))}
-                    className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-700 outline-none cursor-pointer"
-                  >
-                    <option value={2026}>ปี พ.ศ. 2569 (2026)</option>
-                    <option value={2027}>ปี พ.ศ. 2570 (2027)</option>
-                  </select>
+                  <div className="relative inline-flex items-center">
+                    <select
+                      value={selectedYear}
+                      onChange={(e) => setSelectedYear(Number(e.target.value))}
+                      className="appearance-none bg-white border border-slate-200 hover:border-[#1d61f2] focus:border-[#1d61f2] rounded-2xl pl-3.5 pr-8 py-2 text-xs font-bold text-slate-700 outline-none cursor-pointer transition shadow-2xs"
+                    >
+                      <option value={2026}>ปี พ.ศ. 2569</option>
+                      <option value={2027}>ปี พ.ศ. 2570</option>
+                    </select>
+                    <ChevronDown size={14} className="text-slate-400 absolute right-2.5 pointer-events-none" />
+                  </div>
                 </div>
               </div>
 
@@ -2031,13 +2052,14 @@ const DashboardPage = () => {
                   </div>
 
                   <div className="flex items-center gap-2.5">
-                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3.5 py-2 rounded-2xl">
-                      <Calendar size={16} className="text-[#1d61f2]" />
+                    {/* ตัวเลือกวันที่ดีไซน์สวยงาม */}
+                    <div className="flex items-center gap-2 bg-white border border-slate-200 hover:border-[#1d61f2] px-3.5 py-2 rounded-2xl shadow-2xs transition">
+                      <Calendar size={15} className="text-[#1d61f2] shrink-0" />
                       <input
                         type="date"
                         value={completedFilterDate}
                         onChange={(e) => setCompletedFilterDate(e.target.value)}
-                        className="bg-transparent text-sm font-bold text-slate-700 outline-none cursor-pointer"
+                        className="bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer"
                       />
                     </div>
                     {completedFilterDate && (
@@ -2146,17 +2168,18 @@ const DashboardPage = () => {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-5 border-b border-slate-100">
                   <div>
                     <h3 className="font-heading font-bold text-base text-slate-900">รายการคำสั่งซื้อที่ยกเลิก</h3>
-                    <p className="text-sm text-slate-500 mt-0.5">เลือกวันที่เพื่อตรวจสอบออเดอร์ที่ลูกค้ายกเลิกในแต่ละวัน</p>
+                    <p className="text-sm text-slate-500 mt-0.5">เลือกวันที่เพื่อตรวจสอบออเดอร์ที่ยกเลิกในแต่ละวัน</p>
                   </div>
 
                   <div className="flex items-center gap-2.5">
-                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3.5 py-2 rounded-2xl">
-                      <Calendar size={16} className="text-red-500" />
+                    {/* ตัวเลือกวันที่ดีไซน์สวยงาม */}
+                    <div className="flex items-center gap-2 bg-white border border-slate-200 hover:border-red-400 px-3.5 py-2 rounded-2xl shadow-2xs transition">
+                      <Calendar size={15} className="text-red-500 shrink-0" />
                       <input
                         type="date"
                         value={cancelledFilterDate}
                         onChange={(e) => setCancelledFilterDate(e.target.value)}
-                        className="bg-transparent text-sm font-bold text-slate-700 outline-none cursor-pointer"
+                        className="bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer"
                       />
                     </div>
                     {cancelledFilterDate && (
@@ -2193,7 +2216,7 @@ const DashboardPage = () => {
                           <th className="py-4 px-2.5 text-left w-36">บริการ</th>
                           <th className="py-4 px-5 text-left w-32">ยอดเงิน</th>
                           <th className="py-4 px-5 text-left w-44">เวลาที่ยกเลิก</th>
-                          <th className="py-4 px-5 text-left">เหตุผลที่ลูกค้ายกเลิก</th>
+                          <th className="py-4 px-5 text-left">เหตุผลที่ยกเลิก</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 bg-white">
@@ -2295,7 +2318,6 @@ const DashboardPage = () => {
                   </div>
                 </div>
 
-                {/* การ์ดยอดรายได้รายปี */}
                 <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between bg-gradient-to-br from-white to-blue-50/40">
                   <div>
                     <span className="text-xs font-bold text-slate-400 block tracking-wide">
@@ -2314,7 +2336,7 @@ const DashboardPage = () => {
                 </div>
               </div>
 
-              {/* กราฟสถิติรายรับ พร้อมปุ่มดูรายปี */}
+              {/* กราฟสถิติรายรับ พร้อมตัวเลือกสลับดูช่วงเวลา */}
               <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 flex flex-col gap-6">
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-100">
                   <div className="flex items-center gap-3">
@@ -2329,11 +2351,11 @@ const DashboardPage = () => {
                           chartViewMode === 'weekly' ? 'รอบ 7 วันล่าสุด (แยกวัน)' : 'วันนี้ (รายชั่วโมง)'
                         }
                       </h3>
-                      <p className="text-xs text-slate-500 mt-0.5">แผนภูมิแท่งเปรียบเทียบสถิติรายได้ตามช่วงเวลาจริง</p>
+                      <p className="text-xs text-slate-500 mt-0.5">แผนภูมิแท่งเปรียบเทียบสถิติรายได้ตามช่วงเวลาจริง (หักยอดยกเลิกออกแล้ว)</p>
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2.5">
                     <div className="bg-slate-100 p-1 rounded-2xl flex gap-1">
                       <button
                         type="button"
@@ -2389,7 +2411,7 @@ const DashboardPage = () => {
                             setSelectedMonth(Number(e.target.value));
                             setChartViewMode('by_month');
                           }}
-                          className="appearance-none bg-slate-50 border border-slate-200 hover:border-[#1d61f2] focus:border-[#1d61f2] rounded-2xl pl-3 pr-8 py-2 text-xs font-bold text-slate-700 outline-none cursor-pointer transition shadow-2xs"
+                          className="appearance-none bg-white border border-slate-200 hover:border-[#1d61f2] focus:border-[#1d61f2] rounded-2xl pl-3.5 pr-8 py-2 text-xs font-bold text-slate-700 outline-none cursor-pointer transition shadow-2xs"
                         >
                           {thaiMonths.map(m => (
                             <option key={m.value} value={m.value}>
@@ -2409,7 +2431,7 @@ const DashboardPage = () => {
                             setSelectedYear(Number(e.target.value));
                             setChartViewMode('yearly');
                           }}
-                          className="appearance-none bg-slate-50 border border-slate-200 hover:border-[#1d61f2] focus:border-[#1d61f2] rounded-2xl pl-3 pr-8 py-2 text-xs font-bold text-slate-700 outline-none cursor-pointer transition shadow-2xs"
+                          className="appearance-none bg-white border border-slate-200 hover:border-[#1d61f2] focus:border-[#1d61f2] rounded-2xl pl-3.5 pr-8 py-2 text-xs font-bold text-slate-700 outline-none cursor-pointer transition shadow-2xs"
                         >
                           <option value={2026}>ปี พ.ศ. 2569 (2026)</option>
                           <option value={2027}>ปี พ.ศ. 2570 (2027)</option>
@@ -2459,22 +2481,23 @@ const DashboardPage = () => {
                 </div>
               </div>
 
-              {/* รายการคำสั่งซื้อที่คิดเป็นรายได้ */}
+              {/* รายการคำสั่งซื้อที่คิดเป็นรายได้ (แจกแจงยอดสุทธิ vs ยอดที่ยกเลิก/คืนเงิน) */}
               <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-4 border-b border-slate-100">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 mb-4 border-b border-slate-100">
                   <div>
                     <h3 className="font-heading font-bold text-base text-slate-900">รายการคำสั่งซื้อที่คิดเป็นรายได้ (แยกตามวัน)</h3>
                     <p className="text-sm text-slate-500 mt-0.5">เลือกวันที่ต้องการเพื่อตรวจเช็กรายการคำสั่งซื้อเฉพาะวันนั้น</p>
                   </div>
 
-                  <div className="flex items-center gap-2.5">
-                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3.5 py-2 rounded-2xl">
-                      <Calendar size={16} className="text-[#1d61f2]" />
+                  <div className="flex flex-wrap items-center gap-3">
+                    {/* ตัวเลือกวันที่ดีไซน์สวยงาม */}
+                    <div className="flex items-center gap-2 bg-white border border-slate-200 hover:border-[#1d61f2] px-3.5 py-2 rounded-2xl shadow-2xs transition">
+                      <Calendar size={15} className="text-[#1d61f2] shrink-0" />
                       <input
                         type="date"
                         value={revenueFilterDate}
                         onChange={(e) => setRevenueFilterDate(e.target.value)}
-                        className="bg-transparent text-sm font-bold text-slate-700 outline-none cursor-pointer"
+                        className="bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer"
                       />
                     </div>
                     {revenueFilterDate && (
@@ -2486,9 +2509,19 @@ const DashboardPage = () => {
                         ดูทุกวัน
                       </button>
                     )}
-                    <div className="text-right pl-3 border-l border-slate-200">
-                      <span className="text-xs text-slate-400 block font-medium">ยอดรวมสะสม</span>
-                      <span className="text-base font-extrabold text-emerald-600">{totalRevenue.toLocaleString()} ฿</span>
+                    
+                    {/* สรุปยอดเงินสุทธิ และ ยอดที่ยกเลิกคืนเงิน */}
+                    <div className="flex items-center gap-3 pl-3 border-l border-slate-200">
+                      <div className="text-right">
+                        <span className="text-[11px] text-slate-400 block font-medium">ยอดรับสุทธิ (Net)</span>
+                        <span className="text-base font-extrabold text-emerald-600">{totalNetRevenue.toLocaleString()} ฿</span>
+                      </div>
+                      {totalRefunds > 0 && (
+                        <div className="text-right pl-3 border-l border-slate-200">
+                          <span className="text-[11px] text-red-400 block font-medium">ยอดยกเลิก/คืนเงิน</span>
+                          <span className="text-sm font-extrabold text-red-500">-{totalRefunds.toLocaleString()} ฿</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -2746,34 +2779,40 @@ const DashboardPage = () => {
                       </div>
                     </div>
 
-                    {/* ตัวเลือกเดือน/ปี */}
-                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 p-1 rounded-2xl">
-                      <select
-                        value={curMonth}
-                        onChange={(e) => {
-                          const newM = Number(e.target.value);
-                          const d = new Date(curYear, newM, 1);
-                          setSelectedDate(d.toISOString().split('T')[0]);
-                        }}
-                        className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-700 outline-none cursor-pointer shadow-2xs"
-                      >
-                        {thaiMonths.map(m => (
-                          <option key={m.value} value={m.value}>เดือน{m.label}</option>
-                        ))}
-                      </select>
+                    {/* ตัวเลือกเดือน/ปี ดีไซน์โมเดิร์น */}
+                    <div className="flex items-center gap-2.5">
+                      <div className="relative inline-flex items-center">
+                        <select
+                          value={curMonth}
+                          onChange={(e) => {
+                            const newM = Number(e.target.value);
+                            const d = new Date(curYear, newM, 1);
+                            setSelectedDate(d.toISOString().split('T')[0]);
+                          }}
+                          className="appearance-none bg-white border border-slate-200 hover:border-[#1d61f2] focus:border-[#1d61f2] rounded-2xl pl-3.5 pr-8 py-2 text-xs font-bold text-slate-700 outline-none cursor-pointer transition shadow-2xs"
+                        >
+                          {thaiMonths.map(m => (
+                            <option key={m.value} value={m.value}>เดือน{m.label}</option>
+                          ))}
+                        </select>
+                        <ChevronDown size={14} className="text-slate-400 absolute right-2.5 pointer-events-none" />
+                      </div>
 
-                      <select
-                        value={curYear}
-                        onChange={(e) => {
-                          const newY = Number(e.target.value);
-                          const d = new Date(newY, curMonth, 1);
-                          setSelectedDate(d.toISOString().split('T')[0]);
-                        }}
-                        className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-700 outline-none cursor-pointer shadow-2xs"
-                      >
-                        <option value={2026}>พ.ศ. 2569</option>
-                        <option value={2025}>พ.ศ. 2570</option>
-                      </select>
+                      <div className="relative inline-flex items-center">
+                        <select
+                          value={curYear}
+                          onChange={(e) => {
+                            const newY = Number(e.target.value);
+                            const d = new Date(newY, curMonth, 1);
+                            setSelectedDate(d.toISOString().split('T')[0]);
+                          }}
+                          className="appearance-none bg-white border border-slate-200 hover:border-[#1d61f2] focus:border-[#1d61f2] rounded-2xl pl-3.5 pr-8 py-2 text-xs font-bold text-slate-700 outline-none cursor-pointer transition shadow-2xs"
+                        >
+                          <option value={2026}>พ.ศ. 2569</option>
+                          <option value={2027}>พ.ศ. 2570</option>
+                        </select>
+                        <ChevronDown size={14} className="text-slate-400 absolute right-2.5 pointer-events-none" />
+                      </div>
                     </div>
                   </div>
 

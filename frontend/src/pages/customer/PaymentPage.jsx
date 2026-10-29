@@ -57,7 +57,7 @@ export default function PaymentPage() {
 
   const bankAccount = {
     bankName: 'ธนาคารไทยพาณิชย์ (SCB)',
-    accountNumber: '133-236365-9',
+    accountNumber: '133-239201-4',
     accountName: 'ธิดาพร อู่แสงทอง',
   };
 
