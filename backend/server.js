@@ -17,7 +17,7 @@ console.log('----------------------------------------');
 
 import express from 'express';
 import cors from 'cors';
-import { testDatabaseConnection } from './src/config/db.js'; 
+import { testConnection } from './src/config/db.js';
 import orderRoutes from './src/routes/orderRoutes.js';
 import authRoutes from './src/routes/authRoutes.js';
 import paymentRoutes from './src/routes/paymentRoutes.js';
@@ -42,6 +42,6 @@ app.get('/api/health', (req, res) => {
 });
 
 app.listen(PORT, async () => {
-  console.log(`🚀 เซิร์ฟเวอร์ทำงานที่พอร์ต http://localhost:${PORT}`);
+  console.log(`เซิร์ฟเวอร์ทำงานที่พอร์ต http://localhost:${PORT}`);
   await testDatabaseConnection(); 
 });
