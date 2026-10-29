@@ -518,7 +518,15 @@ const DashboardPage = () => {
      (o.customerName && o.customerName.toLowerCase().includes(searchTerm.toLowerCase())))
   );
 
-  const washingOrders = (orders || []).filter(o => Number(o.statusStep) === 5 && !o.isCancelled);
+  // ออเดอร์กำลังดำเนินการ: รวมงานทุกขั้นตอนตั้งแต่ Step 2 ถึง 6
+  const inProgressOrders = (orders || []).filter(o => {
+    const step = Number(o.statusStep);
+    const isCancelled = o.isCancelled || o.status === 'cancelled';
+    const isCompleted = step >= 7 || o.status === 'completed';
+    return step >= 2 && step <= 6 && !isCancelled && !isCompleted && 
+      (String(o.id).toLowerCase().includes(searchTerm.toLowerCase()) || 
+       (o.customerName && o.customerName.toLowerCase().includes(searchTerm.toLowerCase())));
+  });
 
   const allDeliveredOrders = useMemo(() => {
     return (orders || []).filter(o => (Number(o.statusStep) === 7 || o.status === 'completed') && !o.isCancelled);
@@ -638,15 +646,13 @@ const DashboardPage = () => {
       const isCancelled = o.isCancelled || o.status === 'cancelled';
       const isPaid = o.paymentVerified === true || Number(o.statusStep) >= 3 || Number(o.statusStep) === 7 || o.status === 'completed';
 
-      // 1. จัดการออเดอร์ที่ถูกยกเลิก: ไม่นำไปบวกเป็นรายได้ และคิดเข้ายอดยกเลิก/คืนเงิน
       if (isCancelled) {
         if (isPaid || o.paymentSlip || o.cancelReason?.includes('ฉุกเฉิน')) {
           refundTotal += amount;
         }
-        return; // ตัดออก ไม่บวกเป็นรายรับใดๆ ทั้งสิ้น
+        return;
       }
 
-      // 2. ถ้ายังไม่ชำระเงิน หรือสลิปโดนปฏิเสธ จะไม่นับเป็นรายได้
       if (!isPaid || o.paymentRejected) return;
 
       grossTotal += amount;
@@ -698,7 +704,6 @@ const DashboardPage = () => {
         else monthWeeksMap['สัปดาห์ 4'] += amount;
       }
 
-      // ยอดขายรายปี
       const isMatchingYear = fullDateStr.includes(String(currentYearCE)) || fullDateStr.includes(String(currentYearBE)) || !fullDateStr.match(/\b25\d{2}\b|\b20\d{2}\b/);
       if (isMatchingYear) {
         yearly += amount;
@@ -1130,7 +1135,7 @@ const DashboardPage = () => {
                 value={emergencyCancelModal.reason}
                 onChange={(e) => setEmergencyCancelModal(prev => ({ ...prev, reason: e.target.value }))}
                 placeholder="เช่น ซอยบ้านลูกค้าน้ำท่วมสูง ไม่สามารถนำรถเข้ารับผ้าได้..."
-                className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-xs font-medium text-slate-800 outline-none focus:border-red-500 resize-none"
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-xs font-medium text-slate-800 outline-none focus:border-red-500 resize-none break-words"
               />
               <span className="text-[11px] text-slate-400 mt-1 block">
                 * ระบบจะปรับสถานะออเดอร์เป็น "ยกเลิก" และย้ายเข้าสู่หมวดออเดอร์ที่ยกเลิกทันที
@@ -1209,6 +1214,26 @@ const DashboardPage = () => {
               )}
             </button>
 
+            {/* แท็บเดี่ยว: รวมออเดอร์กำลังดำเนินการ (In Progress) และซักอบผ้า */}
+            <button
+              onClick={() => handleTabChange('in_progress')}
+              className={`w-full flex items-center ${isSidebarOpen ? 'justify-between px-3.5' : 'justify-center px-0'} py-3 rounded-2xl text-sm font-bold transition cursor-pointer relative group ${
+                activeTab === 'in_progress' 
+                  ? 'bg-[#1d61f2] text-white shadow-md shadow-blue-500/20' 
+                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Clock size={20} className="shrink-0" />
+                {isSidebarOpen && <span className="truncate">ออเดอร์กำลังดำเนินการ</span>}
+              </div>
+              {inProgressOrders.length > 0 && (
+                <span className={`${isSidebarOpen ? 'px-2 py-0.5 text-xs' : 'absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center text-xs'} bg-blue-500 text-white font-black rounded-full`}>
+                  {inProgressOrders.length}
+                </span>
+              )}
+            </button>
+
             {/* แท็บ: จัดการไรเดอร์และสถิติงาน */}
             <button
               onClick={() => handleTabChange('riders')}
@@ -1238,25 +1263,6 @@ const DashboardPage = () => {
             >
               <Tag size={20} className="shrink-0" />
               {isSidebarOpen && <span className="truncate">ปรับโครงสร้างราคา</span>}
-            </button>
-
-            <button
-              onClick={() => handleTabChange('washing')}
-              className={`w-full flex items-center ${isSidebarOpen ? 'justify-between px-3.5' : 'justify-center px-0'} py-3 rounded-2xl text-sm font-bold transition cursor-pointer relative group ${
-                activeTab === 'washing' 
-                  ? 'bg-[#1d61f2] text-white shadow-md shadow-blue-500/20' 
-                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <Sparkles size={20} className="shrink-0" />
-                {isSidebarOpen && <span className="truncate">ผ้ากำลังซักอบ</span>}
-              </div>
-              {washingOrders.length > 0 && (
-                <span className={`${isSidebarOpen ? 'px-2 py-0.5 text-xs' : 'absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center text-xs'} bg-blue-500 text-white font-black rounded-full`}>
-                  {washingOrders.length}
-                </span>
-              )}
             </button>
 
             <button
@@ -1388,10 +1394,10 @@ const DashboardPage = () => {
           <div>
             <h1 className="font-heading font-bold text-base text-slate-900 leading-tight">
               {activeTab === 'slips' && 'ตรวจสอบสลิปและมอบหมายไรเดอร์'}
+              {activeTab === 'in_progress' && 'รายการออเดอร์ที่กำลังดำเนินการ (In Progress)'}
               {activeTab === 'riders' && 'ระบบบริหารจัดการไรเดอร์และสถิติการวิ่งงาน'}
               {activeTab === 'pricing' && 'ระบบปรับโครงสร้างราคาและค่าบริการ'}
               {activeTab === 'customers' && 'สถิติความถี่การใช้บริการของลูกค้าต่อปี (Customer Annual Frequency)'}
-              {activeTab === 'washing' && 'แผนกซัก-อบผ้าของทางร้าน'}
               {activeTab === 'completed' && 'รายการที่ไรเดอร์ส่งมอบผ้าสำเร็จแล้ว'}
               {activeTab === 'cancelled' && 'รายการคำสั่งซื้อที่ยกเลิก'}
               {activeTab === 'analytics' && 'ภาพรวมรายรับ (รายวัน / รายสัปดาห์ / รายเดือน / รายปี)'}
@@ -1596,7 +1602,111 @@ const DashboardPage = () => {
             </div>
           )}
 
-          {/* ======================= แท็บ 2: จัดการ & สถิติไรเดอร์ ======================= */}
+          {/* ======================= แท็บ 2: ออเดอร์กำลังดำเนินการ (In Progress) ======================= */}
+          {activeTab === 'in_progress' && (
+            <div className="space-y-6">
+              <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden p-6">
+                <div className="flex items-center justify-between pb-4 mb-5 border-b border-slate-100">
+                  <div>
+                    <h3 className="font-heading font-bold text-base text-slate-900">
+                      รายการออเดอร์ที่กำลังดำเนินการ ({inProgressOrders.length} รายการ)
+                    </h3>
+                    <p className="text-sm text-slate-500 mt-0.5">
+                      ศูนย์รวมออเดอร์ที่ผ่านการอนุมัติแล้ว อยู่ระหว่างรับผ้า, ซักอบ หรือนำส่งคืน สามารถจัดการงานและยกเลิกฉุกเฉินได้ทันที
+                    </p>
+                  </div>
+                  <span className="bg-blue-50 text-[#1d61f2] font-bold text-sm px-3.5 py-1 rounded-full">
+                    กำลังวิ่งงาน {inProgressOrders.length} ออเดอร์
+                  </span>
+                </div>
+
+                {inProgressOrders.length === 0 ? (
+                  <div className="py-20 text-center text-slate-400 flex flex-col items-center gap-2">
+                    <Clock size={44} className="text-slate-300" />
+                    <span className="text-sm font-semibold">ไม่มีออเดอร์ที่กำลังดำเนินการในขณะนี้</span>
+                  </div>
+                ) : (
+                  <div className="w-full overflow-x-auto">
+                    <table className="w-full text-left text-sm border-collapse min-w-[1050px]">
+                      <thead>
+                        <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold text-xs uppercase tracking-wider">
+                          <th className="py-4 px-5">เลขออเดอร์</th>
+                          <th className="py-4 px-4">ลูกค้า</th>
+                          <th className="py-4 px-4">บริการ</th>
+                          <th className="py-4 px-4">สถานะการทำงาน</th>
+                          <th className="py-4 px-4">ไรเดอร์ผู้ดูแล</th>
+                          <th className="py-4 px-4">ยอดเงิน</th>
+                          <th className="py-4 px-5 text-center">ดำเนินการ</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 bg-white">
+                        {inProgressOrders.map(order => {
+                          const isWashingStep = Number(order.statusStep) === 5;
+
+                          return (
+                            <tr key={order.id} className="hover:bg-slate-50/60 transition">
+                              <td className="py-4 px-5 font-extrabold text-[#1d61f2]">#{order.id}</td>
+                              <td className="py-4 px-4">
+                                <span className="font-bold text-slate-800 block">{order.customerName || 'คุณลูกค้า'}</span>
+                                <span className="text-xs text-slate-400">{order.customerPhone || '-'}</span>
+                              </td>
+                              <td className="py-4 px-4">
+                                <span className="font-semibold text-slate-800 block">{order.serviceName}</span>
+                                {order.packageName && <span className="text-xs text-slate-400">{order.packageName}</span>}
+                              </td>
+                              <td className="py-4 px-4">
+                                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
+                                  isWashingStep 
+                                    ? 'bg-purple-50 text-purple-700 border-purple-200' 
+                                    : 'bg-blue-50 text-[#1d61f2] border-blue-200'
+                                }`}>
+                                  <span className={`w-2 h-2 rounded-full ${isWashingStep ? 'bg-purple-500' : 'bg-[#1d61f2]'} animate-pulse`} />
+                                  {order.statusTitle || 'กำลังดำเนินการ'}
+                                </span>
+                              </td>
+                              <td className="py-4 px-4 text-xs font-bold text-slate-700">
+                                {order.rider?.name || order.pickup_rider_id || 'ไรเดอร์ประจำร้าน'}
+                              </td>
+                              <td className="py-4 px-4 font-extrabold text-slate-900">
+                                {(order.totalPrice || order.price || 0).toLocaleString()} ฿
+                              </td>
+                              <td className="py-4 px-5 text-center">
+                                <div className="inline-flex items-center gap-2 justify-center">
+                                  {isWashingStep && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCompleteWashing(order.id)}
+                                      className="px-3 py-1.5 bg-[#1d61f2] hover:bg-blue-700 text-white rounded-xl font-bold text-xs shadow-2xs flex items-center gap-1.5 transition cursor-pointer"
+                                      title="ซักอบเสร็จแล้ว ส่งงานให้ไรเดอร์"
+                                    >
+                                      <Truck size={14} /> ซักอบเสร็จ
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => setEmergencyCancelModal({
+                                      isOpen: true,
+                                      orderId: order.id,
+                                      reason: 'ซอยบ้านลูกค้าน้ำท่วม/ถนนชำรุด ไรเดอร์ไม่สามารถเข้าพื้นที่ได้'
+                                    })}
+                                    className="px-3 py-1.5 border border-red-300 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl font-bold text-xs transition cursor-pointer shadow-2xs"
+                                  >
+                                    ยกเลิกฉุกเฉิน
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ======================= แท็บ 3: จัดการ & สถิติไรเดอร์ ======================= */}
           {activeTab === 'riders' && (
             <div className="space-y-6 max-w-5xl">
               <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -1779,7 +1889,7 @@ const DashboardPage = () => {
             </div>
           )}
 
-          {/* ======================= แท็บ 3: ปรับโครงสร้างราคา ======================= */}
+          {/* ======================= แท็บ 4: ปรับโครงสร้างราคา ======================= */}
           {activeTab === 'pricing' && (
             <div className="space-y-6 max-w-5xl">
               <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
@@ -1906,7 +2016,7 @@ const DashboardPage = () => {
             </div>
           )}
 
-          {/* ======================= แท็บ 4: สถิติดูแลลูกค้าต่อปี ======================= */}
+          {/* ======================= แท็บ 5: สถิติดูแลลูกค้าต่อปี ======================= */}
           {activeTab === 'customers' && (
             <div className="space-y-6 max-w-5xl">
               <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
@@ -1924,8 +2034,8 @@ const DashboardPage = () => {
                       onChange={(e) => setSelectedYear(Number(e.target.value))}
                       className="appearance-none bg-white border border-slate-200 hover:border-[#1d61f2] focus:border-[#1d61f2] rounded-2xl pl-3.5 pr-8 py-2 text-xs font-bold text-slate-700 outline-none cursor-pointer transition shadow-2xs"
                     >
-                      <option value={2026}>ปี พ.ศ. 2569</option>
-                      <option value={2027}>ปี พ.ศ. 2570</option>
+                      <option value={2026}>ปี พ.ศ. 2569 (2026)</option>
+                      <option value={2027}>ปี พ.ศ. 2570 (2027)</option>
                     </select>
                     <ChevronDown size={14} className="text-slate-400 absolute right-2.5 pointer-events-none" />
                   </div>
@@ -1976,71 +2086,6 @@ const DashboardPage = () => {
             </div>
           )}
 
-          {/* ======================= แท็บ 5: แผนกผ้าซักอบ ======================= */}
-          {activeTab === 'washing' && (
-            <div className="space-y-6">
-              <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden p-6">
-                <div className="flex items-center justify-between pb-4 mb-5 border-b border-slate-100">
-                  <div>
-                    <h3 className="font-heading font-bold text-base text-slate-900">รายการผ้าที่กำลังดำเนินการซัก-อบที่ร้าน</h3>
-                    <p className="text-sm text-slate-500 mt-0.5">เมื่อผ้าแห้งสนิทและพับเรียบร้อยแล้ว ให้กดปุ่มเพื่อเรียกไรเดอร์ส่งคืนลูกค้า</p>
-                  </div>
-                  <span className="bg-blue-50 text-[#1d61f2] font-bold text-sm px-3.5 py-1 rounded-full">
-                    {washingOrders.length} รายการ
-                  </span>
-                </div>
-
-                {washingOrders.length === 0 ? (
-                  <div className="py-20 text-center text-slate-400 flex flex-col items-center gap-2">
-                    <Sparkles size={40} className="text-slate-300" />
-                    <span className="text-sm">ไม่มีรายการผ้าที่กำลังซักอบในขณะนี้</span>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    {washingOrders.map(order => (
-                      <div key={order.id} className="p-5 rounded-2xl border border-blue-100 bg-blue-50/30 flex flex-col justify-between gap-4">
-                        <div>
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <span className="font-bold text-base text-[#1d61f2] block">ออเดอร์ #{order.id}</span>
-                              <span className="text-xs text-slate-400 font-medium">สั่งเมื่อ: {order.createdAt || '-'}</span>
-                            </div>
-                            <span className="text-xs font-bold bg-white text-blue-800 border border-blue-200 px-3 py-1 rounded-xl">
-                              {order.serviceName}
-                            </span>
-                          </div>
-                          <div className="mt-3 space-y-1.5 text-sm text-slate-600">
-                            <div className="truncate"><span className="font-bold">ลูกค้า:</span> {order.customerName || 'คุณลูกค้า'} ({order.customerPhone || '-'})</div>
-                            <div className="line-clamp-2 leading-relaxed"><span className="font-bold">ที่อยู่จัดส่ง:</span> {order.address}</div>
-                            <div className="truncate"><span className="font-bold text-blue-700">ไรเดอร์ผู้ดูแล:</span> {order.rider?.name || 'สมชาย ส่งไว'}</div>
-                          </div>
-                        </div>
-
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleCompleteWashing(order.id)}
-                            className="flex-1 py-3 bg-[#1d61f2] hover:bg-blue-700 text-white font-bold text-sm rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer"
-                          >
-                            <Truck size={18} /> ซักอบเสร็จแล้ว - ส่งงานให้ไรเดอร์
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setEmergencyCancelModal({ isOpen: true, orderId: order.id, reason: 'เกิดเหตุขัดข้องฉุกเฉินในการจัดส่ง' })}
-                            className="px-3 py-3 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl font-bold text-xs transition cursor-pointer"
-                            title="ยกเลิกฉุกเฉิน"
-                          >
-                            ยกเลิกฉุกเฉิน
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
           {/* ======================= แท็บ 6: รายการที่ส่งมอบสำเร็จแล้ว ======================= */}
           {activeTab === 'completed' && (
             <div className="space-y-6">
@@ -2052,7 +2097,6 @@ const DashboardPage = () => {
                   </div>
 
                   <div className="flex items-center gap-2.5">
-                    {/* ตัวเลือกวันที่ดีไซน์สวยงาม */}
                     <div className="flex items-center gap-2 bg-white border border-slate-200 hover:border-[#1d61f2] px-3.5 py-2 rounded-2xl shadow-2xs transition">
                       <Calendar size={15} className="text-[#1d61f2] shrink-0" />
                       <input
@@ -2161,7 +2205,7 @@ const DashboardPage = () => {
             </div>
           )}
 
-          {/* ======================= แท็บ 7: ออเดอร์ที่ถูกยกเลิก ======================= */}
+          {/* ======================= แท็บ 7: ออเดอร์ที่ถูกยกเลิก (แก้ปัญหาข้อความยาวล้น) ======================= */}
           {activeTab === 'cancelled' && (
             <div className="space-y-6">
               <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden p-6">
@@ -2172,7 +2216,6 @@ const DashboardPage = () => {
                   </div>
 
                   <div className="flex items-center gap-2.5">
-                    {/* ตัวเลือกวันที่ดีไซน์สวยงาม */}
                     <div className="flex items-center gap-2 bg-white border border-slate-200 hover:border-red-400 px-3.5 py-2 rounded-2xl shadow-2xs transition">
                       <Calendar size={15} className="text-red-500 shrink-0" />
                       <input
@@ -2214,8 +2257,8 @@ const DashboardPage = () => {
                           <th className="py-4 px-5 text-left w-36">เลขออเดอร์</th>
                           <th className="py-4 px-2.5 text-left w-36">ลูกค้า</th>
                           <th className="py-4 px-2.5 text-left w-36">บริการ</th>
-                          <th className="py-4 px-5 text-left w-32">ยอดเงิน</th>
-                          <th className="py-4 px-5 text-left w-44">เวลาที่ยกเลิก</th>
+                          <th className="py-4 px-5 text-left w-28">ยอดเงิน</th>
+                          <th className="py-4 px-5 text-left w-40">เวลาที่ยกเลิก</th>
                           <th className="py-4 px-5 text-left">เหตุผลที่ยกเลิก</th>
                         </tr>
                       </thead>
@@ -2251,8 +2294,12 @@ const DashboardPage = () => {
                               </span>
                             </td>
 
+                            {/* กล่องแสดงเหตุผลที่ปรับแก้: ไม่จำกัดความสูง บรรทัดตัดคำสวยงาม อ่านได้ครบถ้วน */}
                             <td className="py-4 px-5 align-middle text-slate-700 text-left">
-                              <div className="bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-xs font-medium line-clamp-2 leading-relaxed max-w-md" title={order.cancelReason}>
+                              <div 
+                                className="bg-red-50/40 border border-red-100 px-3.5 py-2 rounded-2xl text-xs font-medium text-slate-800 whitespace-normal break-words leading-relaxed max-w-lg shadow-2xs" 
+                                title={order.cancelReason}
+                              >
                                 {order.cancelReason || 'ไม่ระบุเหตุผล'}
                               </div>
                             </td>
@@ -2481,7 +2528,7 @@ const DashboardPage = () => {
                 </div>
               </div>
 
-              {/* รายการคำสั่งซื้อที่คิดเป็นรายได้ (แจกแจงยอดสุทธิ vs ยอดที่ยกเลิก/คืนเงิน) */}
+              {/* รายการคำสั่งซื้อที่คิดเป็นรายได้ */}
               <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 mb-4 border-b border-slate-100">
                   <div>
@@ -2490,7 +2537,6 @@ const DashboardPage = () => {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-3">
-                    {/* ตัวเลือกวันที่ดีไซน์สวยงาม */}
                     <div className="flex items-center gap-2 bg-white border border-slate-200 hover:border-[#1d61f2] px-3.5 py-2 rounded-2xl shadow-2xs transition">
                       <Calendar size={15} className="text-[#1d61f2] shrink-0" />
                       <input
@@ -2510,7 +2556,6 @@ const DashboardPage = () => {
                       </button>
                     )}
                     
-                    {/* สรุปยอดเงินสุทธิ และ ยอดที่ยกเลิกคืนเงิน */}
                     <div className="flex items-center gap-3 pl-3 border-l border-slate-200">
                       <div className="text-right">
                         <span className="text-[11px] text-slate-400 block font-medium">ยอดรับสุทธิ (Net)</span>
@@ -2702,7 +2747,7 @@ const DashboardPage = () => {
             const curMonth = new Date(selectedDate).getMonth();
 
             const daysInMonth = new Date(curYear, curMonth + 1, 0).getDate();
-            const firstDayOfWeek = new Date(curYear, curMonth, 1).getDay(); // 0 = อาทิตย์
+            const firstDayOfWeek = new Date(curYear, curMonth, 1).getDay();
 
             const monthDays = [];
             for (let i = 0; i < firstDayOfWeek; i++) {
@@ -2809,7 +2854,7 @@ const DashboardPage = () => {
                           className="appearance-none bg-white border border-slate-200 hover:border-[#1d61f2] focus:border-[#1d61f2] rounded-2xl pl-3.5 pr-8 py-2 text-xs font-bold text-slate-700 outline-none cursor-pointer transition shadow-2xs"
                         >
                           <option value={2026}>พ.ศ. 2569</option>
-                          <option value={2027}>พ.ศ. 2570</option>
+                          <option value={2027}>ปี พ.ศ. 2570 (2027)</option>
                         </select>
                         <ChevronDown size={14} className="text-slate-400 absolute right-2.5 pointer-events-none" />
                       </div>
@@ -2818,7 +2863,6 @@ const DashboardPage = () => {
 
                   {/* Calendar Grid Display */}
                   <div className="bg-slate-50/70 p-4 rounded-3xl border border-slate-200/60">
-                    {/* หัวตารางวันในสัปดาห์ */}
                     <div className="grid grid-cols-7 gap-2 mb-2">
                       {weekHeaders.map((dayName, idx) => (
                         <div 
@@ -2832,7 +2876,6 @@ const DashboardPage = () => {
                       ))}
                     </div>
 
-                    {/* ช่องวันที่ทั้งหมด */}
                     <div className="grid grid-cols-7 gap-2">
                       {monthDays.map((item, index) => {
                         if (!item) {
