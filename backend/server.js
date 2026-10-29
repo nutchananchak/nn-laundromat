@@ -1,6 +1,12 @@
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import express from 'express';
+import cors from 'cors';
+import { testDatabaseConnection } from './src/config/db.js'; 
+import orderRoutes from './src/routes/orderRoutes.js';
+import authRoutes from './src/routes/authRoutes.js';
+import paymentRoutes from './src/routes/paymentRoutes.js';
 
 // 1. ระบุตำแหน่งโฟลเดอร์ของ server.js ให้ชัดเจน
 const __filename = fileURLToPath(import.meta.url);
@@ -11,16 +17,9 @@ dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 // ตรวจสอบค่าตอนเปิดเซิร์ฟเวอร์ทันที
 console.log('----------------------------------------');
-console.log('🔍 [ENV CHECK] SMS API KEY:', process.env.THAIBULKSMS_API_KEY ? '✅ โหลดสำเร็จ' : '❌ ไม่พบ (undefined)');
-console.log('🔍 [ENV CHECK] SMS SECRET :', process.env.THAIBULKSMS_API_SECRET ? '✅ โหลดสำเร็จ' : '❌ ไม่พบ (undefined)');
+console.log('🔍 [ENV CHECK] SMS API KEY:', process.env.THAIBULKSMS_API_KEY ? 'โหลดสำเร็จ' : 'ไม่พบ (undefined)');
+console.log('🔍 [ENV CHECK] SMS SECRET :', process.env.THAIBULKSMS_API_SECRET ? 'โหลดสำเร็จ' : 'ไม่พบ (undefined)');
 console.log('----------------------------------------');
-
-import express from 'express';
-import cors from 'cors';
-import { testConnection } from './src/config/db.js';
-import orderRoutes from './src/routes/orderRoutes.js';
-import authRoutes from './src/routes/authRoutes.js';
-import paymentRoutes from './src/routes/paymentRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -42,6 +41,6 @@ app.get('/api/health', (req, res) => {
 });
 
 app.listen(PORT, async () => {
-  console.log(`เซิร์ฟเวอร์ทำงานที่พอร์ต http://localhost:${PORT}`);
+  console.log(`🚀 เซิร์ฟเวอร์ทำงานที่พอร์ต http://localhost:${PORT}`);
   await testDatabaseConnection(); 
 });

@@ -17,8 +17,7 @@ const pool = mysql.createPool({
   }
 });
 
-// ฟังก์ชันทดสอบการเชื่อมต่อตอนเซิร์ฟเวอร์เริ่มทำงาน
-export const testConnection = async () => {
+export const testDatabaseConnection = async () => {
   try {
     const connection = await pool.getConnection();
     console.log('เชื่อมต่อฐานข้อมูล MySQL สำเร็จ');
