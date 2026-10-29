@@ -4,23 +4,27 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const pool = mysql.createPool({
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'nn_laundromat',
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME || 'defaultdb',
   port: Number(process.env.DB_PORT) || 3306,
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0
+  queueLimit: 0,
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
 
-export const testDatabaseConnection = async () => {
+// ฟังก์ชันทดสอบการเชื่อมต่อตอนเซิร์ฟเวอร์เริ่มทำงาน
+export const testConnection = async () => {
   try {
     const connection = await pool.getConnection();
-    console.log('✅ เชื่อมต่อฐานข้อมูล MySQL (Localhost) สำเร็จเรียบร้อย!');
+    console.log('เชื่อมต่อฐานข้อมูล MySQL สำเร็จ');
     connection.release();
   } catch (error) {
-    console.error('❌ เชื่อมต่อฐานข้อมูล MySQL ไม่สำเร็จ:', error.message);
+    console.error('เชื่อมต่อฐานข้อมูลล้มเหลว:', error.message);
   }
 };
 
