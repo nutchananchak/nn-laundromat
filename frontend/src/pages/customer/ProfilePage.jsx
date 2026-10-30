@@ -642,7 +642,7 @@ export default function ProfilePage() {
 
         {/* Floating Toast */}
         {toast.show && (
-          <div className="absolute top-5 left-4 right-4 z-60 animate-in slide-in-from-top-4 duration-200">
+          <div className="absolute top-5 left-4 right-4 z-50 animate-in slide-in-from-top-4 duration-200">
             <div className={`p-3.5 rounded-2xl shadow-xl border flex items-center gap-3 backdrop-blur-md text-white ${
               toast.type === 'error'
                 ? 'bg-red-500/95 border-red-400 shadow-red-500/20'
@@ -652,49 +652,6 @@ export default function ProfilePage() {
                 {toast.type === 'error' ? <AlertTriangle size={18} /> : <CheckCircle2 size={18} />}
               </div>
               <span className="text-xs font-bold flex-1 leading-snug">{toast.message}</span>
-            </div>
-          </div>
-        )}
-
-        {/* Confirmation Modal */}
-        {confirmModal.isOpen && (
-          <div className="absolute inset-0 bg-slate-900/60 z-60 flex items-center justify-center p-6 backdrop-blur-xs animate-in fade-in duration-150">
-            <div className="bg-white w-full max-w-xs rounded-3xl p-6 shadow-2xl flex flex-col gap-4 text-center border border-slate-100 animate-in zoom-in-95 duration-150">
-              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mx-auto ${
-                confirmModal.iconType === 'logout' 
-                  ? 'bg-red-50 text-red-600' 
-                  : confirmModal.iconType === 'trash'
-                  ? 'bg-red-50 text-red-600'
-                  : 'bg-blue-50 text-[#1d61f2]'
-              }`}>
-                {confirmModal.iconType === 'logout' ? (
-                  <LogOut size={24} />
-                ) : confirmModal.iconType === 'trash' ? (
-                  <Trash2 size={24} />
-                ) : (
-                  <HelpCircle size={24} />
-                )}
-              </div>
-              <div>
-                <h3 className="font-heading font-bold text-base text-slate-900">{confirmModal.title}</h3>
-                <p className="text-xs text-slate-500 mt-1 leading-relaxed">{confirmModal.message}</p>
-              </div>
-              <div className="flex gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
-                  className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 transition cursor-pointer"
-                >
-                  ยกเลิก
-                </button>
-                <button
-                  type="button"
-                  onClick={confirmModal.onConfirm}
-                  className={`flex-1 py-2.5 rounded-xl text-white font-bold text-xs shadow-md transition cursor-pointer ${confirmModal.confirmColor}`}
-                >
-                  {confirmModal.confirmText}
-                </button>
-              </div>
             </div>
           </div>
         )}
@@ -915,12 +872,12 @@ export default function ProfilePage() {
 
         </div>
 
-        {/* Modal ที่อยู่ Google Maps: จัดโครงสร้างแยกส่วนแผนที่กับส่วน Scroll ชัดเจน */}
+        {/* Modal ที่อยู่ Google Maps (แก้ไข Layer และเปิดสิทธิ์ Pointer Events ให้พิมพ์และกดยืนยันได้แน่นอน) */}
         {showAddressModal && (
           <div className="fixed inset-0 z-50 bg-black/80 flex items-end sm:items-center justify-center backdrop-blur-xs">
             <div 
               style={{ height: '94dvh', maxHeight: '94dvh' }}
-              className="bg-white w-full max-w-[430px] rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-200"
+              className="bg-white w-full max-w-[430px] rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden relative animate-in slide-in-from-bottom duration-200"
             >
               {/* Header */}
               <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white z-20">
@@ -940,9 +897,8 @@ export default function ProfilePage() {
                 </button>
               </div>
 
-              {/* ส่วนบน (Fixed): Search + แผนที่ Google Map */}
+              {/* ส่วนบน: Search + Google Map (Fixed Area) */}
               <div className="shrink-0 flex flex-col bg-slate-100 border-b border-slate-200">
-                {/* Search Bar */}
                 <div className="px-3.5 py-2 bg-slate-50 border-b border-slate-100 relative z-30">
                   <form onSubmit={handleDirectSearch} className="relative flex gap-2">
                     <div className="relative flex-1">
@@ -992,8 +948,7 @@ export default function ProfilePage() {
                   </form>
                 </div>
 
-                {/* Map Container (ความสูงคงที่ 220px ใช้งานง่าย ไม่ล้นจอ) */}
-                <div className="relative w-full h-[220px] bg-slate-100 shrink-0">
+                <div className="relative w-full h-[200px] bg-slate-100 shrink-0">
                   {isLoaded && addressCoords ? (
                     <GoogleMap
                       mapContainerStyle={{ width: '100%', height: '100%' }}
@@ -1033,7 +988,6 @@ export default function ProfilePage() {
                     </div>
                   )}
 
-                  {/* หมุดกึ่งกลาง */}
                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full pointer-events-none z-10 flex flex-col items-center">
                     <div className="w-8 h-8 rounded-full bg-[#1d61f2] text-white flex items-center justify-center shadow-xl border-2 border-white ring-4 ring-blue-500/30">
                       <MapPin size={18} />
@@ -1041,7 +995,6 @@ export default function ProfilePage() {
                     <div className="w-1.5 h-1.5 rounded-full bg-slate-900/60 blur-[1px] mt-0.5"></div>
                   </div>
 
-                  {/* ปุ่มเปลี่ยนประเภทแผนที่ */}
                   <button
                     type="button"
                     onClick={() => setMapType(prev => prev === 'roadmap' ? 'hybrid' : 'roadmap')}
@@ -1051,7 +1004,6 @@ export default function ProfilePage() {
                     <span>{mapType === 'roadmap' ? 'ดาวเทียม' : 'แผนที่'}</span>
                   </button>
 
-                  {/* ปุ่ม GPS */}
                   <button
                     type="button"
                     onClick={handleGetLiveGPS}
@@ -1061,7 +1013,6 @@ export default function ProfilePage() {
                     <LocateFixed size={16} className={isLocating ? 'text-blue-500 animate-spin' : ''} />
                   </button>
 
-                  {/* ป้ายบอกระยะห่าง */}
                   <div className="absolute top-2.5 left-2.5 z-10 pointer-events-none">
                     <div className={`px-2.5 py-1 rounded-lg text-[11px] font-bold shadow-md flex items-center gap-1 ${
                       isWithinRange ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
@@ -1072,73 +1023,74 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              {/* ส่วนล่าง (Scrollable Form): เฉพาะส่วนกรอกข้อมูล แตะพิมพ์ง่าย เลื่อนได้ 100% */}
-              <div 
-                className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-3 bg-white"
-                style={{ 
-                  WebkitOverflowScrolling: 'touch',
-                  overscrollBehavior: 'contain'
-                }}
+              {/* ส่วนฟอร์มกรอกข้อมูล: มี form tag และ trigger submit ชัดเจน */}
+              <form 
+                onSubmit={handleSaveAddress}
+                className="flex-1 min-h-0 flex flex-col bg-white overflow-hidden"
               >
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">
-                    ชื่อสถานที่เรียกง่าย <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="เช่น บ้าน, คอนโด A ชั้น 5, หอพัก..."
-                    value={addressTitle}
-                    onChange={(e) => setAddressTitle(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-[#1d61f2] focus:bg-white"
-                  />
+                <div 
+                  className="flex-1 overflow-y-auto p-4 flex flex-col gap-3.5"
+                  style={{ WebkitOverflowScrolling: 'touch' }}
+                >
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">
+                      ชื่อสถานที่เรียกง่าย[cite: 2] <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="เช่น บ้าน, คอนโด A, หอพัก..."
+                      value={addressTitle}
+                      onChange={(e) => setAddressTitle(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-[#1d61f2] focus:bg-white transition cursor-text pointer-events-auto"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">
+                      รายละเอียดที่อยู่ (บ้านเลขที่ / เลขห้อง / อาคาร / ซอย)[cite: 2] <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      rows="3"
+                      required
+                      placeholder="เช่น 123/45 ซอยอ่อนนุช 25 อาคาร B ห้อง 301..."
+                      value={addressDetail}
+                      onChange={(e) => setAddressDetail(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-[#1d61f2] focus:bg-white resize-none transition cursor-text pointer-events-auto"
+                    ></textarea>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">
-                    รายละเอียดที่อยู่ (บ้านเลขที่ / ซอย / จุดสังเกต) <span className="text-red-500">*</span>
-                  </label>
-                  <textarea
-                    rows="3"
-                    required
-                    placeholder="เช่น 123/45 ซอยอ่อนนุช 25 อาคาร B ห้อง 301 (ปักหมุดตรงประตูทางเข้า)..."
-                    value={addressDetail}
-                    onChange={(e) => setAddressDetail(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-[#1d61f2] focus:bg-white resize-none"
-                  ></textarea>
+                {/* แถบปุ่ม Action ด้านล่างสุด */}
+                <div className="p-3 bg-white border-t border-slate-100 flex gap-2 shrink-0 z-30 shadow-lg">
+                  <button 
+                    type="button" 
+                    onClick={() => setShowAddressModal(false)} 
+                    className="py-3 px-4 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs cursor-pointer hover:bg-slate-50 active:scale-95 transition"
+                  >
+                    ยกเลิก[cite: 2]
+                  </button>
+                  <button 
+                    type="submit"
+                    disabled={!isWithinRange}
+                    className={`flex-1 py-3 rounded-xl font-bold text-xs transition cursor-pointer shadow-md active:scale-98 ${
+                      isWithinRange 
+                        ? 'bg-[#1d61f2] hover:bg-blue-700 text-white shadow-blue-500/20' 
+                        : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                    }`}
+                  >
+                    {isWithinRange ? 'ยืนยันปักหมุดตำแหน่งนี้' : 'อยู่นอกเขตให้บริการ 3 กม.'}[cite: 2]
+                  </button>
                 </div>
-              </div>
-
-              {/* Action Bar (Fixed ด้านล่างสุดเสมอ) */}
-              <div className="p-3 bg-white border-t border-slate-100 flex gap-2 shrink-0 z-30 shadow-lg">
-                <button 
-                  type="button" 
-                  onClick={() => setShowAddressModal(false)} 
-                  className="py-3 px-4 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs cursor-pointer hover:bg-slate-50"
-                >
-                  ยกเลิก
-                </button>
-                <button 
-                  type="button" 
-                  onClick={handleSaveAddress}
-                  disabled={!isWithinRange}
-                  className={`flex-1 py-3 rounded-xl font-bold text-xs transition cursor-pointer shadow-md ${
-                    isWithinRange 
-                      ? 'bg-[#1d61f2] hover:bg-blue-700 active:scale-98 text-white shadow-blue-500/20' 
-                      : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
-                  }`}
-                >
-                  {isWithinRange ? 'ยืนยันปักหมุดตำแหน่งนี้' : 'อยู่นอกเขตให้บริการ 3 กม.'}
-                </button>
-              </div>
+              </form>
 
             </div>
           </div>
         )}
 
-        {/* Modal แก้ไขข้อมูลส่วนตัว + OTP */}
+        {/* Modal แก้ไขข้อมูลส่วนตัว + OTP (เรนเดอร์เฉพาะเมื่อเปิดใช้งาน) */}
         {showEditProfileModal && (
-          <div className="absolute inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-6 backdrop-blur-xs">
+          <div className="fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-6 backdrop-blur-xs">
             <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl flex flex-col gap-4 border border-slate-100">
               <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                 <h3 className="font-bold text-base text-slate-900">
@@ -1269,9 +1221,9 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* Modal แจ้งเรื่องร้องเรียน */}
+        {/* Modal แจ้งเรื่องร้องเรียน (เรนเดอร์เฉพาะเมื่อเปิดใช้งาน) */}
         {showReportModal && (
-          <div className="absolute inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-6 backdrop-blur-xs">
+          <div className="fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-6 backdrop-blur-xs">
             <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl flex flex-col gap-3.5 border border-slate-100">
               <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                 <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
@@ -1328,6 +1280,49 @@ export default function ProfilePage() {
                   </div>
                 </form>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Confirmation Modal (ย้ายมาไว้ล่างสุดและเปิดเฉพาะเมื่อสั่งเปิด) */}
+        {confirmModal.isOpen && (
+          <div className="fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-6 backdrop-blur-xs animate-in fade-in duration-150">
+            <div className="bg-white w-full max-w-xs rounded-3xl p-6 shadow-2xl flex flex-col gap-4 text-center border border-slate-100 animate-in zoom-in-95 duration-150">
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mx-auto ${
+                confirmModal.iconType === 'logout' 
+                  ? 'bg-red-50 text-red-600' 
+                  : confirmModal.iconType === 'trash'
+                  ? 'bg-red-50 text-red-600'
+                  : 'bg-blue-50 text-[#1d61f2]'
+              }`}>
+                {confirmModal.iconType === 'logout' ? (
+                  <LogOut size={24} />
+                ) : confirmModal.iconType === 'trash' ? (
+                  <Trash2 size={24} />
+                ) : (
+                  <HelpCircle size={24} />
+                )}
+              </div>
+              <div>
+                <h3 className="font-heading font-bold text-base text-slate-900">{confirmModal.title}</h3>
+                <p className="text-xs text-slate-500 mt-1 leading-relaxed">{confirmModal.message}</p>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 transition cursor-pointer"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmModal.onConfirm}
+                  className={`flex-1 py-2.5 rounded-xl text-white font-bold text-xs shadow-md transition cursor-pointer ${confirmModal.confirmColor}`}
+                >
+                  {confirmModal.confirmText}
+                </button>
+              </div>
             </div>
           </div>
         )}
