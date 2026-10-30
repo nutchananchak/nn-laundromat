@@ -873,7 +873,7 @@ export default function ProfilePage() {
 
         </div>
 
-        {/* Modal ที่อยู่ Google Maps (ใช้ createPortal ส่งออกไปติด body โดยตรง ไม่โดน BottomNav บัง 100%) */}
+        {/* Modal ที่อยู่ Google Maps (Mount ด้วย React Portal ตรงสู่ document.body) */}
         {showAddressModal && typeof document !== 'undefined' && createPortal(
           <div 
             style={{ 
@@ -1047,7 +1047,7 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              {/* ส่วนฟอร์มกรอกข้อมูล: Scrollable Form ที่อยู่นอก Container ปกติ */}
+              {/* ส่วนฟอร์มกรอกข้อมูล: รองรับทั้งแตะ Quick Tags และพิมพ์ได้โดยไม่หลุดโฟกัส */}
               <form 
                 onSubmit={handleSaveAddress}
                 className="flex-1 min-h-0 flex flex-col bg-white overflow-hidden"
@@ -1057,17 +1057,43 @@ export default function ProfilePage() {
                   style={{ WebkitOverflowScrolling: 'touch' }}
                 >
                   <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">
-                      ชื่อสถานที่เรียกง่าย <span className="text-red-500">*</span>
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-bold text-slate-700 block">
+                        ชื่อสถานที่เรียกง่าย <span className="text-red-500">*</span>
+                      </label>
+                      <span className="text-[10px] text-slate-400 font-medium">แตะเลือกหรือพิมพ์เอง</span>
+                    </div>
+
                     <input
                       type="text"
                       required
+                      autoComplete="off"
                       placeholder="เช่น บ้าน, คอนโด A, หอพัก..."
                       value={addressTitle}
-                      onChange={(e) => setAddressTitle(e.target.value)}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        setAddressTitle(e.target.value);
+                      }}
                       className="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-[#1d61f2] focus:bg-white"
                     />
+
+                    {/* Quick Tags ช่วยให้ลูกค้ากดเลือกคำยอดฮิตได้ทันที */}
+                    <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                      {['บ้าน', 'คอนโด', 'ที่ทำงาน', 'หอพัก'].map((tag) => (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => setAddressTitle(tag)}
+                          className={`px-3 py-1 rounded-lg text-xs font-bold border transition cursor-pointer active:scale-95 ${
+                            addressTitle === tag
+                              ? 'bg-[#1d61f2] text-white border-[#1d61f2] shadow-xs'
+                              : 'bg-slate-100 text-slate-600 border-slate-200/80 hover:bg-slate-200'
+                          }`}
+                        >
+                          {tag}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   <div>
@@ -1079,13 +1105,16 @@ export default function ProfilePage() {
                       required
                       placeholder="เช่น 123/45 ซอยอ่อนนุช 25 อาคาร B ห้อง 301..."
                       value={addressDetail}
-                      onChange={(e) => setAddressDetail(e.target.value)}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        setAddressDetail(e.target.value);
+                      }}
                       className="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-[#1d61f2] focus:bg-white resize-none"
                     ></textarea>
                   </div>
                 </div>
 
-                {/* แถบปุ่ม Action ด้านล่างสุด (ลอยอยู่เหนือทุกอย่าง ไม่มีทางโดน BottomNav บัง) */}
+                {/* แถบปุ่ม Action ด้านล่างสุด */}
                 <div className="p-4 bg-white border-t border-slate-100 flex gap-2 shrink-0 shadow-lg">
                   <button 
                     type="button" 
