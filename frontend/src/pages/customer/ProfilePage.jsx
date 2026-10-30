@@ -656,7 +656,7 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* Custom Confirmation Modal */}
+        {/* Confirmation Modal */}
         {confirmModal.isOpen && (
           <div className="absolute inset-0 bg-slate-900/60 z-60 flex items-center justify-center p-6 backdrop-blur-xs animate-in fade-in duration-150">
             <div className="bg-white w-full max-w-xs rounded-3xl p-6 shadow-2xl flex flex-col gap-4 text-center border border-slate-100 animate-in zoom-in-95 duration-150">
@@ -915,19 +915,21 @@ export default function ProfilePage() {
 
         </div>
 
-        {/* Modal ที่อยู่ Google Maps (ปรับโครงสร้างแยกส่วนปุ่ม Fixed ไว้ล่างสุด และเปิด Scroll ได้อย่างสมบูรณ์) */}
+        {/* Modal ที่อยู่ Google Maps: จัดโครงสร้างแยกส่วนแผนที่กับส่วน Scroll ชัดเจน */}
         {showAddressModal && (
-          <div className="fixed inset-0 bg-black/80 z-50 flex items-end sm:items-center justify-center backdrop-blur-xs">
-            <div className="bg-white w-full max-w-[430px] h-[92vh] max-h-[92vh] rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-200">
-              
-              {/* Modal Header */}
-              <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white z-20">
+          <div className="fixed inset-0 z-50 bg-black/80 flex items-end sm:items-center justify-center backdrop-blur-xs">
+            <div 
+              style={{ height: '94dvh', maxHeight: '94dvh' }}
+              className="bg-white w-full max-w-[430px] rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-200"
+            >
+              {/* Header */}
+              <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white z-20">
                 <div>
-                  <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
-                    <MapPin size={18} className="text-[#1d61f2]" />
+                  <h3 className="font-bold text-sm text-slate-900 flex items-center gap-1.5">
+                    <MapPin size={17} className="text-[#1d61f2]" />
                     {editingAddressId ? 'แก้ไขตำแหน่งที่อยู่' : 'ปักหมุดที่อยู่รับ-ส่งผ้า'}
                   </h3>
-                  <span className="text-[11px] text-slate-400">เลื่อนแผนที่ให้เป้าตรงกับหน้าบ้าน/คอนโดของคุณ</span>
+                  <span className="text-[10.5px] text-slate-400">เลื่อนแผนที่ให้เป้าตรงกับตำแหน่งของคุณ</span>
                 </div>
                 <button 
                   type="button" 
@@ -938,56 +940,48 @@ export default function ProfilePage() {
                 </button>
               </div>
 
-              {/* Scrollable Modal Body (ใส่ min-h-0 เพื่อให้รูดจอเลื่อนลงได้เสมอ) */}
-              <div 
-                className="flex-1 min-h-0 overflow-y-auto flex flex-col pb-4"
-                style={{ 
-                  WebkitOverflowScrolling: 'touch',
-                  overscrollBehavior: 'contain'
-                }}
-              >
+              {/* ส่วนบน (Fixed): Search + แผนที่ Google Map */}
+              <div className="shrink-0 flex flex-col bg-slate-100 border-b border-slate-200">
                 {/* Search Bar */}
-                <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 shrink-0 sticky top-0 z-30">
+                <div className="px-3.5 py-2 bg-slate-50 border-b border-slate-100 relative z-30">
                   <form onSubmit={handleDirectSearch} className="relative flex gap-2">
                     <div className="relative flex-1">
-                      <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 z-10" />
+                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10" />
                       <input
                         type="text"
-                        placeholder="ค้นหาชื่อคอนโด, อาคาร, ซอย หรือสถานที่..."
+                        placeholder="พิมพ์ค้นหาคอนโด, ซอย, สถานที่..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         onFocus={() => { if (suggestions.length > 0) setShowDropdown(true); }}
-                        className="w-full bg-white border border-slate-200 pl-9 pr-8 py-2.5 rounded-2xl text-xs font-medium text-slate-800 outline-none focus:border-[#1d61f2] focus:ring-3 focus:ring-blue-100 shadow-xs transition"
+                        className="w-full bg-white border border-slate-200 pl-8 pr-7 py-2 rounded-xl text-xs font-medium text-slate-800 outline-none focus:border-[#1d61f2]"
                       />
                       {isSearching && (
-                        <Loader2 size={14} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#1d61f2] animate-spin z-10" />
+                        <Loader2 size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#1d61f2] animate-spin z-10" />
                       )}
                     </div>
 
                     <button
                       type="submit"
                       disabled={isSearching}
-                      className="px-4 py-2.5 bg-[#1d61f2] hover:bg-blue-700 active:scale-95 text-white text-xs font-bold rounded-2xl cursor-pointer transition shadow-xs shrink-0 flex items-center gap-1"
+                      className="px-3.5 py-2 bg-[#1d61f2] hover:bg-blue-700 text-white text-xs font-bold rounded-xl cursor-pointer transition shrink-0"
                     >
                       ค้นหา
                     </button>
 
                     {showDropdown && suggestions.length > 0 && (
-                      <div className="absolute left-0 right-16 top-[calc(100%+6px)] bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-slate-100 overflow-hidden z-40 max-h-56 overflow-y-auto divide-y divide-slate-100">
+                      <div className="absolute left-0 right-14 top-[calc(100%+4px)] bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-slate-100 overflow-hidden z-40 max-h-48 overflow-y-auto divide-y divide-slate-100">
                         {suggestions.map((item) => (
                           <div
                             key={item.place_id}
                             onClick={() => handleSelectPrediction(item)}
-                            className="px-4 py-3 hover:bg-blue-50/80 active:bg-blue-100/70 cursor-pointer text-left transition flex items-start gap-3 group"
+                            className="px-3 py-2.5 hover:bg-blue-50/80 active:bg-blue-100 cursor-pointer text-left transition flex items-start gap-2 group"
                           >
-                            <div className="w-6 h-6 rounded-lg bg-blue-50 text-[#1d61f2] flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-[#1d61f2] group-hover:text-white transition">
-                              <MapPin size={13} />
-                            </div>
+                            <MapPin size={13} className="text-[#1d61f2] shrink-0 mt-0.5" />
                             <div className="flex-1 min-w-0">
-                              <p className="text-xs font-bold text-slate-800 truncate group-hover:text-[#1d61f2] transition">
+                              <p className="text-xs font-bold text-slate-800 truncate">
                                 {item.structured_formatting?.main_text || item.description}
                               </p>
-                              <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                              <p className="text-[10px] text-slate-400 truncate">
                                 {item.structured_formatting?.secondary_text || item.description}
                               </p>
                             </div>
@@ -998,8 +992,8 @@ export default function ProfilePage() {
                   </form>
                 </div>
 
-                {/* Google Map Container (ปรับความสูงเป็น h-64 ให้พอดีมือ และไม่กินพื้นที่จอเกินไป) */}
-                <div className="relative w-full h-64 min-h-[250px] shrink-0 bg-slate-100">
+                {/* Map Container (ความสูงคงที่ 220px ใช้งานง่าย ไม่ล้นจอ) */}
+                <div className="relative w-full h-[220px] bg-slate-100 shrink-0">
                   {isLoaded && addressCoords ? (
                     <GoogleMap
                       mapContainerStyle={{ width: '100%', height: '100%' }}
@@ -1011,7 +1005,8 @@ export default function ProfilePage() {
                       options={{
                         disableDefaultUI: true,
                         zoomControl: true,
-                        clickableIcons: false
+                        clickableIcons: false,
+                        gestureHandling: 'greedy'
                       }}
                     >
                       <CircleF
@@ -1027,86 +1022,99 @@ export default function ProfilePage() {
                       />
                     </GoogleMap>
                   ) : loadError ? (
-                    <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center text-red-500">
-                      <AlertCircle size={32} className="mb-2" />
-                      <span className="font-bold text-sm">ไม่สามารถโหลด Google Maps ได้</span>
+                    <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center text-red-500">
+                      <AlertCircle size={28} className="mb-1" />
+                      <span className="font-bold text-xs">ไม่สามารถโหลด Google Maps ได้</span>
                     </div>
                   ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 text-xs font-bold gap-2">
-                      <Loader2 size={24} className="animate-spin text-[#1d61f2]" />
-                      <span>กำลังระบุพิกัดตำแหน่งบ้านของคุณ...</span>
+                    <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 text-xs font-bold gap-1.5">
+                      <Loader2 size={22} className="animate-spin text-[#1d61f2]" />
+                      <span>กำลังระบุพิกัดตำแหน่งของคุณ...</span>
                     </div>
                   )}
 
+                  {/* หมุดกึ่งกลาง */}
                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full pointer-events-none z-10 flex flex-col items-center">
-                    <div className="w-9 h-9 rounded-full bg-[#1d61f2] text-white flex items-center justify-center shadow-xl border-2 border-white ring-4 ring-blue-500/30 animate-bounce">
-                      <MapPin size={20} />
+                    <div className="w-8 h-8 rounded-full bg-[#1d61f2] text-white flex items-center justify-center shadow-xl border-2 border-white ring-4 ring-blue-500/30">
+                      <MapPin size={18} />
                     </div>
-                    <div className="w-2 h-2 rounded-full bg-slate-900/60 blur-[1px] mt-0.5"></div>
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-900/60 blur-[1px] mt-0.5"></div>
                   </div>
 
+                  {/* ปุ่มเปลี่ยนประเภทแผนที่ */}
                   <button
                     type="button"
                     onClick={() => setMapType(prev => prev === 'roadmap' ? 'hybrid' : 'roadmap')}
-                    className="absolute top-3 right-3 z-10 bg-white/95 backdrop-blur-xs border border-slate-200 text-slate-700 hover:text-[#1d61f2] px-3 py-1.5 rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5 cursor-pointer transition active:scale-95"
+                    className="absolute top-2.5 right-2.5 z-10 bg-white/95 backdrop-blur-xs border border-slate-200 text-slate-700 px-2.5 py-1 rounded-lg text-[11px] font-bold shadow-md flex items-center gap-1 cursor-pointer"
                   >
-                    <Layers size={14} className="text-[#1d61f2]" />
+                    <Layers size={13} className="text-[#1d61f2]" />
                     <span>{mapType === 'roadmap' ? 'ดาวเทียม' : 'แผนที่'}</span>
                   </button>
 
+                  {/* ปุ่ม GPS */}
                   <button
                     type="button"
                     onClick={handleGetLiveGPS}
-                    className="absolute bottom-4 right-3 z-10 w-10 h-10 rounded-2xl bg-white border border-slate-200 text-slate-700 hover:text-[#1d61f2] shadow-lg flex items-center justify-center cursor-pointer transition active:scale-90"
+                    className="absolute bottom-2.5 right-2.5 z-10 w-9 h-9 rounded-xl bg-white border border-slate-200 text-slate-700 shadow-md flex items-center justify-center cursor-pointer"
                     title="ตำแหน่ง GPS ปัจจุบัน"
                   >
-                    <LocateFixed size={18} className={isLocating ? 'text-blue-500 animate-spin' : ''} />
+                    <LocateFixed size={16} className={isLocating ? 'text-blue-500 animate-spin' : ''} />
                   </button>
 
-                  <div className="absolute top-3 left-3 z-10 pointer-events-none">
-                    <div className={`px-3 py-1.5 rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5 ${
+                  {/* ป้ายบอกระยะห่าง */}
+                  <div className="absolute top-2.5 left-2.5 z-10 pointer-events-none">
+                    <div className={`px-2.5 py-1 rounded-lg text-[11px] font-bold shadow-md flex items-center gap-1 ${
                       isWithinRange ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
                     }`}>
-                      <span>ระยะห่างจากร้าน: ~{distanceFromStore.toFixed(2)} กม.</span>
-                      <span>{isWithinRange ? '(ในเขตบริการ)' : '(เกิน 3 กม.)'}</span>
+                      <span>~{distanceFromStore.toFixed(2)} กม. {isWithinRange ? '(ในเขต)' : '(เกิน 3 กม.)'}</span>
                     </div>
-                  </div>
-                </div>
-
-                {/* Form Fields Section */}
-                <div className="p-4 bg-white flex flex-col gap-3">
-                  <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">ชื่อสถานที่เรียกง่าย</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="เช่น บ้าน, คอนโด A, หอพัก..."
-                      value={addressTitle}
-                      onChange={(e) => setAddressTitle(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-[#1d61f2]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">รายละเอียดที่อยู่ (บ้านเลขที่ / เลขห้อง / อาคาร / ซอย)</label>
-                    <textarea
-                      rows="2"
-                      required
-                      placeholder="เช่น 123/45 ซอยอ่อนนุช 25 อาคาร B ห้อง 301..."
-                      value={addressDetail}
-                      onChange={(e) => setAddressDetail(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-[#1d61f2] resize-none"
-                    ></textarea>
                   </div>
                 </div>
               </div>
 
-              {/* Fixed Bottom Action Buttons (ตรึงไว้ล่างสุดเสมอ ไม่โดนดันหลุดจอ) */}
-              <div className="p-4 bg-white border-t border-slate-100 flex gap-2 shrink-0 z-30 shadow-lg">
+              {/* ส่วนล่าง (Scrollable Form): เฉพาะส่วนกรอกข้อมูล แตะพิมพ์ง่าย เลื่อนได้ 100% */}
+              <div 
+                className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-3 bg-white"
+                style={{ 
+                  WebkitOverflowScrolling: 'touch',
+                  overscrollBehavior: 'contain'
+                }}
+              >
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    ชื่อสถานที่เรียกง่าย <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="เช่น บ้าน, คอนโด A ชั้น 5, หอพัก..."
+                    value={addressTitle}
+                    onChange={(e) => setAddressTitle(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-[#1d61f2] focus:bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    รายละเอียดที่อยู่ (บ้านเลขที่ / ซอย / จุดสังเกต) <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    rows="3"
+                    required
+                    placeholder="เช่น 123/45 ซอยอ่อนนุช 25 อาคาร B ห้อง 301 (ปักหมุดตรงประตูทางเข้า)..."
+                    value={addressDetail}
+                    onChange={(e) => setAddressDetail(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-[#1d61f2] focus:bg-white resize-none"
+                  ></textarea>
+                </div>
+              </div>
+
+              {/* Action Bar (Fixed ด้านล่างสุดเสมอ) */}
+              <div className="p-3 bg-white border-t border-slate-100 flex gap-2 shrink-0 z-30 shadow-lg">
                 <button 
                   type="button" 
                   onClick={() => setShowAddressModal(false)} 
-                  className="py-3 px-4 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs cursor-pointer hover:bg-slate-50 active:scale-95 transition"
+                  className="py-3 px-4 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs cursor-pointer hover:bg-slate-50"
                 >
                   ยกเลิก
                 </button>
@@ -1114,9 +1122,9 @@ export default function ProfilePage() {
                   type="button" 
                   onClick={handleSaveAddress}
                   disabled={!isWithinRange}
-                  className={`flex-1 py-3 rounded-xl font-bold text-xs transition cursor-pointer shadow-md active:scale-98 ${
+                  className={`flex-1 py-3 rounded-xl font-bold text-xs transition cursor-pointer shadow-md ${
                     isWithinRange 
-                      ? 'bg-[#1d61f2] hover:bg-blue-700 text-white shadow-blue-500/20' 
+                      ? 'bg-[#1d61f2] hover:bg-blue-700 active:scale-98 text-white shadow-blue-500/20' 
                       : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
                   }`}
                 >
