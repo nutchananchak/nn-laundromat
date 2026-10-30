@@ -27,7 +27,7 @@ export default function NewOrderPage() {
 
   const serviceType = reorderData.service || location.state?.service || 'wash_dry_fold';
   const [showAddressModal, setShowAddressModal] = useState(false);
-  const displayAddress = currentAddress ? `${currentAddress.title} - ${currentAddress.detail}` : (reorderData.address || null);
+  const displayAddress = currentAddress ? `${currentAddress.title} ${currentAddress.detail}` : (reorderData.address || null);
 
   // ================= 1. ดึง Dynamic Pricing ที่แอดมินบันทึกไว้ =================
   const dynamicPricing = useMemo(() => {
@@ -39,7 +39,7 @@ export default function NewOrderPage() {
     }
   }, []);
 
-  // แพ็กเกจหลัก (ดึงราคาที่แอดมินแก้ไขแล้วแบบอัตโนมัติ)
+  // แพ็กเกจหลัก
   const packages = useMemo(() => {
     if (serviceType === 'bedding') {
       const savedBedding = dynamicPricing?.bedding || [];
@@ -57,7 +57,7 @@ export default function NewOrderPage() {
     ];
   }, [serviceType, dynamicPricing]);
 
-  // ความต้องการพิเศษ (ดึงราคาที่แอดมินแก้ไขแล้วแบบอัตโนมัติ)
+  // ความต้องการพิเศษ (แยกชิ้น)
   const currentSpecialOptions = useMemo(() => {
     if (serviceType === 'bedding') {
       return dynamicPricing?.specialBedding || [
@@ -82,7 +82,6 @@ export default function NewOrderPage() {
     ];
   }, [serviceType, dynamicPricing]);
 
-  // ราคาถุงพลาสติกจากแอดมิน
   const bagUnitPrice = dynamicPricing?.extraBag ?? 5;
 
   const initialPkgId = serviceType === 'bedding'
@@ -183,12 +182,37 @@ export default function NewOrderPage() {
     });
   };
 
+  // บีบอัดรูปถ่ายภาพตะกร้าผ้าลง Canvas ป้องกันภาพ Base64 ใหญ่เกินโควตา
   const handleImageFile = (e) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setBasketImage(reader.result);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 800; // จำกัดความกว้าง/ยาวสูงสุด 800px
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height && width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // บีบอัดคุณภาพเป็น jpeg 0.7 ทำให้ไฟล์เหลือเพียง ~100-200 KB
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+          setBasketImage(compressedDataUrl);
+        };
+        img.src = event.target.result;
       };
       reader.readAsDataURL(file);
     }
@@ -260,7 +284,6 @@ export default function NewOrderPage() {
     navigate('/order/payment', {
       state: {
         order: {
-          id: 'NN-' + Math.floor(100000 + Math.random() * 900000),
           customerName: userProfile?.fullName || userProfile?.name || 'คุณลูกค้า',
           customerPhone: userProfile?.phone || '',
           serviceName: serviceType === 'bedding' ? 'ชุดเครื่องนอน / ผ้านวม' : 'ซัก อบ พับ',

@@ -75,11 +75,11 @@ export default function PaymentPage() {
         if (res && res.qrCodeUrl) {
           setQrCodeUrl(res.qrCodeUrl);
         } else {
-          setQrCodeUrl(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=PROMPTPAY_NN_LAUNDROMAT_ORDER_${orderData.id}_AMOUNT_${payableAmount}THB`);
+          setQrCodeUrl(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=PROMPTPAY_NN_LAUNDROMAT_AMOUNT_${payableAmount}THB`);
         }
       } catch (err) {
         console.error('Failed to generate real PromptPay QR, using fallback:', err);
-        setQrCodeUrl(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=PROMPTPAY_NN_LAUNDROMAT_ORDER_${orderData.id}_AMOUNT_${payableAmount}THB`);
+        setQrCodeUrl(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=PROMPTPAY_NN_LAUNDROMAT_AMOUNT_${payableAmount}THB`);
       } finally {
         setIsQrLoading(false);
       }
@@ -94,111 +94,72 @@ export default function PaymentPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // แปลง Data URL (Base64) เป็น Blob โดยตรง
-  const dataURLtoBlob = (dataurl) => {
-    const arr = dataurl.split(',');
-    const mime = arr[0].match(/:(.*?);/)[1];
-    const bstr = atob(arr[1]);
-    let n = bstr.length;
-    const u8arr = new Uint8Array(n);
-    while (n--) {
-      u8arr[n] = bstr.charCodeAt(n);
-    }
-    return new Blob([u8arr], { type: mime });
-  };
-
-  // ฟังก์ชันบันทึกภาพ QR Code ผ่าน Canvas Rendering (ไม่ติด CORS / ไม่ต้อง fetch)
+  // ฟังก์ชันดาวน์โหลด QR Code สำหรับผู้ใช้ทั่วไป และแจ้งเตือนผู้ใช้ LINE
   const handleDownloadQr = async () => {
-    if (!qrCodeUrl || !orderData) return;
+    if (!qrCodeUrl) return;
+
+    // ตรวจสอบเบราว์เซอร์ของ LINE
+    const isLine = /Line/i.test(navigator.userAgent);
+    if (isLine) {
+      showAlert(
+        'บันทึกรูปภาพใน LINE',
+        'ระบบของ LINE ไม่อนุญาตให้ดาวน์โหลดไฟล์ลงเครื่องอัตโนมัติ กรุณากด "แตะค้างที่รูป QR Code" ด้านบน แล้วเลือก "บันทึกรูปภาพ" ครับ'
+      );
+      return;
+    }
 
     try {
       setIsDownloadingQr(true);
-      const fileName = `QR_NN_Laundromat_${orderData.id || 'Payment'}.png`;
-
-      let blob = null;
-
-      // กรณีที่ 1: ถ้าเป็น Base64 Data URL แปลงตรงๆ ได้ทันที
-      if (qrCodeUrl.startsWith('data:image/')) {
-        blob = dataURLtoBlob(qrCodeUrl);
-      } else {
-        // กรณีที่ 2: วาดภาพลง Canvas ในเครื่อง เพื่อสกัดออกมาเป็น Blob ป้องกันปัญหา CORS
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.src = qrCodeUrl;
-
-        await new Promise((resolve, reject) => {
-          img.onload = resolve;
-          img.onerror = () => {
-            // หากติด crossOrigin ลองดึงตรงๆ
-            const imgDirect = new Image();
-            imgDirect.src = qrCodeUrl;
-            imgDirect.onload = resolve;
-            imgDirect.onerror = reject;
-          };
-        });
-
-        const canvas = document.createElement('canvas');
-        canvas.width = img.naturalWidth || 300;
-        canvas.height = img.naturalHeight || 300;
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0);
-
-        blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
-      }
-
-      if (!blob) throw new Error('Cannot generate blob from image');
-
-      const file = new File([blob], fileName, { type: 'image/png' });
-
-      // ตรวจสอบ Web Share API สำหรับสมาร์ทโฟน
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          title: 'QR Code ชำระเงิน N&N Laundromat',
-          text: `สแกน QR Code เพื่อชำระเงินยอด ${payableAmount} บาท`,
-        });
-        return;
-      }
-
-      // ดาวน์โหลดอัตโนมัติสำหรับคอมพิวเตอร์ / เบราว์เซอร์ที่ไม่รองรับ Share
-      const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = fileName;
+      link.href = qrCodeUrl;
+      link.download = `QR_NN_Laundromat_${Date.now()}.png`;
+      link.target = '_blank';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      window.URL.revokeObjectURL(blobUrl);
-
     } catch (error) {
-      console.error('Error saving QR Code:', error);
-
-      // แผนสำรองกรณีเบราว์เซอร์ล็อกสิทธิ์: เปิดภาพในแท็บใหม่ หรือแนะนำให้แตะค้าง
-      const newTab = window.open();
-      if (newTab) {
-        newTab.document.write(`<img src="${qrCodeUrl}" style="max-width:100%; height:auto;" />`);
-        newTab.document.title = 'QR Code ชำระเงิน';
-      } else {
-        showAlert('คำแนะนำการบันทึกภาพ', 'กรุณากดแตะค้างที่รูปภาพ QR Code ด้านบน แล้วเลือก "บันทึกรูปภาพ" (Save Image) ลงในเครื่องของคุณ');
-      }
+      showAlert('คำแนะนำการบันทึกภาพ', 'กรุณากดแตะค้างที่รูปภาพ QR Code ด้านบน แล้วเลือก "บันทึกรูปภาพ" ลงในเครื่องของคุณ');
     } finally {
       setIsDownloadingQr(false);
     }
   };
 
+  // บีบอัดรูปสลิปให้มีขนาดไม่เกิน 300 KB ป้องกันขนาดล้น Network Payload
   const handleSlipChange = (e) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setSlipImage(reader.result);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 1000;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height && width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          const compressedSlip = canvas.toDataURL('image/jpeg', 0.7);
+          setSlipImage(compressedSlip);
+        };
+        img.src = event.target.result;
       };
       reader.readAsDataURL(file);
     }
   };
 
+  // ยืนยันการชำระเงินและบันทึกออเดอร์
   const handleConfirmPayment = async (e) => {
     e.preventDefault();
     if (!slipImage) {
@@ -212,7 +173,7 @@ export default function PaymentPage() {
       setIsSubmitting(true);
 
       if (isRetry) {
-        // 1. กรณี: ส่งสลิปใหม่เพื่อให้อนุมัติใหม่ (Retry Flow)
+        // 1. Retry Flow
         await updateOrder(orderData.id, {
           paymentVerified: false,
           paymentRejected: false,
@@ -244,22 +205,23 @@ export default function PaymentPage() {
         });
 
         if (setOrders) setOrders(updatedOrders);
-        localStorage.setItem('orders', JSON.stringify(updatedOrders));
 
+        // ตัดรูปภาพ Base64 ออกก่อนเซฟลง localStorage เพื่อไม่ให้ความจุเต็มเด็ดขาด
         try {
-          const currentNotices = JSON.parse(localStorage.getItem('customerNotifications') || '[]');
-          const filteredNotices = currentNotices.filter(n => 
-            !(String(n.orderId) === String(orderData.id) && (n.type === 'slip_rejected' || n.type === 'alert'))
-          );
-          localStorage.setItem('customerNotifications', JSON.stringify(filteredNotices));
-        } catch (err) {
-          console.error(err);
+          const safeStorage = updatedOrders.map(o => ({
+            ...o,
+            slipImage: null,
+            paymentSlip: null,
+            riderBasketImage: null
+          }));
+          localStorage.setItem('orders', JSON.stringify(safeStorage.slice(0, 10)));
+        } catch (e) {
+          console.warn('LocalStorage Quota exceeded, skipped local caching');
         }
 
       } else {
-        // 2. กรณี: สร้างออเดอร์ใหม่ครั้งแรก (ยิงลง MySQL จริง)
+        // 2. New Order Flow (ยิงตรงลง Backend MySQL)
         const orderPayload = {
-          id: orderData.id,
           customerName: orderData.customerName || customerName,
           customerPhone: orderData.customerPhone || customerPhone,
           serviceName: orderData.serviceName || 'ซัก อบ พับ',
@@ -282,13 +244,28 @@ export default function PaymentPage() {
         };
 
         const res = await createNewOrder(orderPayload);
+        const finalOrder = res.order || { ...orderPayload, id: res.id || 'NN-NEW' };
 
         const existingOrders = orders && orders.length > 0
           ? orders
           : JSON.parse(localStorage.getItem('orders') || '[]');
-        const updatedOrders = [res.order || orderPayload, ...existingOrders];
+        
+        const updatedOrders = [finalOrder, ...existingOrders];
         if (setOrders) setOrders(updatedOrders);
-        localStorage.setItem('orders', JSON.stringify(updatedOrders));
+
+        // ตัดรูป Base64 ขนาดใหญ่ออกก่อนเซฟลง localStorage
+        try {
+          const safeStorage = updatedOrders.map(o => ({
+            ...o,
+            slipImage: null,
+            paymentSlip: null,
+            riderBasketImage: null
+          }));
+          localStorage.setItem('orders', JSON.stringify(safeStorage.slice(0, 10)));
+        } catch (e) {
+          console.warn('LocalStorage Quota exceeded, cleared storage cache');
+          localStorage.removeItem('orders');
+        }
       }
 
       setIsSuccessModalOpen(true);
@@ -362,7 +339,7 @@ export default function PaymentPage() {
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
               <span className="font-bold text-slate-900 text-sm">สรุปคำสั่งซื้อ</span>
               <span className="text-xs font-bold text-slate-900 bg-slate-100 px-3 py-1 rounded-full border border-slate-200">
-                #{orderData.id}
+                {orderData.id ? `#${orderData.id}` : 'ออเดอร์ใหม่'}
               </span>
             </div>
 
@@ -487,10 +464,10 @@ export default function PaymentPage() {
                   className="flex items-center gap-2 text-xs font-bold text-[#1d61f2] bg-blue-50 px-5 py-3 rounded-xl border border-blue-100 hover:bg-blue-100 active:scale-95 transition cursor-pointer disabled:opacity-50 shadow-2xs"
                 >
                   {isDownloadingQr ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-                  {isDownloadingQr ? 'กำลังเตรียมรูปภาพ...' : 'บันทึกรูป QR Code'}
+                  {isDownloadingQr ? 'กำลังเปิดรูปภาพ...' : 'บันทึกรูป QR Code'}
                 </button>
-                <span className="text-[11px] text-slate-400 mt-2 block font-medium">
-                  (หรือกดแตะค้างที่รูปภาพ QR Code เพื่อเลือก "บันทึกรูปภาพ")
+                <span className="text-[11px] text-amber-600 font-bold mt-2.5 block bg-amber-50 px-3 py-1 rounded-lg border border-amber-200/60">
+                  💡 หากใช้ผ่าน LINE: โปรดกด "แตะค้างที่รูป QR Code" ด้านบนเพื่อกดบันทึกรูปภาพ
                 </span>
               </>
             ) : (
