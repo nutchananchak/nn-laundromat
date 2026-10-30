@@ -163,14 +163,28 @@ const DashboardPage = () => {
     }, 2800);
   };
 
-  // ดึงข้อมูลออเดอร์จาก API MySQL
+  // ดึงข้อมูลออเดอร์จาก API MySQL (ตัดการยัด Base64 ลง localStorage เพื่อแก้ปัญหา QuotaExceededError ถาวร)
   const loadOrdersFromApi = async () => {
     try {
       const data = await fetchOrders();
       if (setOrders) {
-        setOrders(data);
+        setOrders(data || []);
       }
-      localStorage.setItem('orders', JSON.stringify(data));
+      // เซฟแคชสำรองเฉพาะข้อมูลตัวหนังสือเบาๆ สูงสุด 20 รายการ
+      try {
+        const safeCache = (data || []).slice(0, 20).map(o => ({
+          ...o,
+          slipImage: null,
+          proofImage: null,
+          riderBasketImage: null,
+          riderPickupImage: null,
+          riderDeliveryImage: null,
+          basketImage: null
+        }));
+        localStorage.setItem('orders', JSON.stringify(safeCache));
+      } catch (storageErr) {
+        localStorage.removeItem('orders');
+      }
     } catch (err) {
       console.error('Failed to load orders in admin:', err);
     }
@@ -237,7 +251,7 @@ const DashboardPage = () => {
       });
 
       if (setOrders) {
-        setOrders(prev => prev.map(o => String(o.id) === String(orderId) ? {
+        setOrders(prev => (prev || []).map(o => String(o.id) === String(orderId) ? {
           ...o,
           status: 'cancelled',
           isCancelled: true,
@@ -264,7 +278,9 @@ const DashboardPage = () => {
         type: 'alert',
         isRead: false
       };
-      localStorage.setItem('customerNotifications', JSON.stringify([newNotice, ...currentNotices]));
+      try {
+        localStorage.setItem('customerNotifications', JSON.stringify([newNotice, ...currentNotices].slice(0, 20)));
+      } catch (e) {}
 
       setEmergencyCancelModal({ isOpen: false, orderId: null, reason: '' });
       triggerToast(`ยกเลิกออเดอร์ #${orderId} กรณีฉุกเฉินเรียบร้อยแล้ว`, 'info');
@@ -318,7 +334,9 @@ const DashboardPage = () => {
     openConfirm('ยืนยันแก้ไขปัญหา', 'คุณต้องการเปลี่ยนสถานะเรื่องนี้เป็น "แก้ไขเรียบร้อย" ใช่หรือไม่?', 'ยืนยัน', 'bg-emerald-600', () => {
       const updated = reports.map(r => r.id === reportId ? { ...r, status: 'resolved' } : r);
       setReports(updated);
-      localStorage.setItem('adminReports', JSON.stringify(updated));
+      try {
+        localStorage.setItem('adminReports', JSON.stringify(updated));
+      } catch (e) {}
       triggerToast('อัปเดตสถานะปัญหาเรียบร้อยแล้ว');
       setConfirmModal(prev => ({ ...prev, isOpen: false }));
     });
@@ -328,7 +346,9 @@ const DashboardPage = () => {
     openConfirm('ยืนยันลบรายการ', 'คุณต้องการลบข้อร้องเรียนนี้ออกจากระบบอย่างถาวรใช่หรือไม่?', 'ลบรายการ', 'bg-red-600', () => {
       const updated = reports.filter(r => r.id !== reportId);
       setReports(updated);
-      localStorage.setItem('adminReports', JSON.stringify(updated));
+      try {
+        localStorage.setItem('adminReports', JSON.stringify(updated));
+      } catch (e) {}
       triggerToast('ลบรายการร้องเรียนเรียบร้อยแล้ว', 'info');
       setConfirmModal(prev => ({ ...prev, isOpen: false }));
     });
@@ -338,7 +358,7 @@ const DashboardPage = () => {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
-  // ================= จัดการไรเดอร์ (Riders State) =================
+  // จัดการไรเดอร์
   const [riderList, setRiderList] = useState(() => {
     try {
       const saved = localStorage.getItem('storeRiders');
@@ -354,7 +374,9 @@ const DashboardPage = () => {
 
   const saveRiders = (updated) => {
     setRiderList(updated);
-    localStorage.setItem('storeRiders', JSON.stringify(updated));
+    try {
+      localStorage.setItem('storeRiders', JSON.stringify(updated));
+    } catch (e) {}
   };
 
   const [newRiderForm, setNewRiderForm] = useState({ name: '', phone: '' });
@@ -394,7 +416,7 @@ const DashboardPage = () => {
 
   const activeRiders = useMemo(() => riderList.filter(r => r.status === 'active'), [riderList]);
 
-  // ================= สถิติไรเดอร์ (สัปดาห์ / เดือน / ปี) =================
+  // สถิติไรเดอร์
   const [riderFilterPeriod, setRiderFilterPeriod] = useState('weekly');
   const [riderFilterMonth, setRiderFilterMonth] = useState(new Date().getMonth());
   const [riderFilterYear, setRiderFilterYear] = useState(new Date().getFullYear());
@@ -456,7 +478,7 @@ const DashboardPage = () => {
     });
   }, [riderList, orders, riderFilterPeriod, riderFilterMonth, riderFilterYear]);
 
-  // ================= ปรับโครงสร้างราคา (Pricing State) =================
+  // ปรับโครงสร้างราคา
   const [pricing, setPricing] = useState(() => {
     try {
       const saved = localStorage.getItem('storePricing');
@@ -479,15 +501,23 @@ const DashboardPage = () => {
   };
 
   const handleSavePricing = () => {
-    localStorage.setItem('storePricing', JSON.stringify(pricing));
-    triggerToast('บันทึกโครงสร้างราคาบริการเรียบร้อยแล้ว');
+    try {
+      localStorage.setItem('storePricing', JSON.stringify(pricing));
+      triggerToast('บันทึกโครงสร้างราคาบริการเรียบร้อยแล้ว');
+    } catch (e) {
+      triggerToast('บันทึกราคาไม่สำเร็จ', 'error');
+    }
   };
 
   const [selectedRiders, setSelectedRiders] = useState({});
 
   const [isStoreOpen, setIsStoreOpen] = useState(() => {
-    const saved = localStorage.getItem('storeServiceStatus');
-    return saved !== null ? JSON.parse(saved) : true;
+    try {
+      const saved = localStorage.getItem('storeServiceStatus');
+      return saved !== null ? JSON.parse(saved) : true;
+    } catch (e) {
+      return true;
+    }
   });
 
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -518,7 +548,6 @@ const DashboardPage = () => {
      (o.customerName && o.customerName.toLowerCase().includes(searchTerm.toLowerCase())))
   );
 
-  // ออเดอร์กำลังดำเนินการ: รวมงานทุกขั้นตอนตั้งแต่ Step 2 ถึง 6
   const inProgressOrders = (orders || []).filter(o => {
     const step = Number(o.statusStep);
     const isCancelled = o.isCancelled || o.status === 'cancelled';
@@ -563,7 +592,9 @@ const DashboardPage = () => {
 
       setLastSeenCounts(prev => {
         const updated = { ...prev, [tabName]: currentCount };
-        localStorage.setItem('admin_last_seen_counts', JSON.stringify(updated));
+        try {
+          localStorage.setItem('admin_last_seen_counts', JSON.stringify(updated));
+        } catch (e) {}
         return updated;
       });
     }
@@ -579,7 +610,7 @@ const DashboardPage = () => {
     window.open(mapsUrl, '_blank', 'noopener,noreferrer');
   };
 
-  // ================= คำนวณรายรับ (หักลบออเดอร์ยกเลิก & คืนเงินอย่างถูกต้อง) =================
+  // คำนวณรายรับ
   const { 
     dailyRevenue, 
     weeklyRevenue, 
@@ -732,7 +763,7 @@ const DashboardPage = () => {
     };
   }, [orders, selectedMonth, selectedYear, revenueFilterDate]);
 
-  // ================= สถิติความถี่การใช้บริการของลูกค้าต่อปี =================
+  // สถิติลูกค้า
   const customerAnnualStats = useMemo(() => {
     const map = {};
     const targetYearStr = String(selectedYear);
@@ -805,7 +836,7 @@ const DashboardPage = () => {
 
       let targetOrder = null;
       if (setOrders) {
-        setOrders(prev => prev.map(order => {
+        setOrders(prev => (prev || []).map(order => {
           if (String(order.id) === String(orderId)) {
             targetOrder = order;
             return {
@@ -853,7 +884,10 @@ const DashboardPage = () => {
         isRead: false
       };
 
-      localStorage.setItem('customerNotifications', JSON.stringify([newNotice, ...cleanedNotices]));
+      try {
+        localStorage.setItem('customerNotifications', JSON.stringify([newNotice, ...cleanedNotices].slice(0, 20)));
+      } catch (e) {}
+
       triggerToast(`อนุมัติออเดอร์ #${orderId} และมอบหมายงานให้ "${chosenRider.name}" แล้ว`);
     } catch (err) {
       console.error(err);
@@ -877,7 +911,7 @@ const DashboardPage = () => {
 
       let targetOrder = null;
       if (setOrders) {
-        setOrders(prev => prev.map(order => {
+        setOrders(prev => (prev || []).map(order => {
           if (String(order.id) === String(orderId)) {
             targetOrder = order;
             return {
@@ -919,7 +953,10 @@ const DashboardPage = () => {
         isRead: false
       };
 
-      localStorage.setItem('customerNotifications', JSON.stringify([newNotice, ...cleanedNotices]));
+      try {
+        localStorage.setItem('customerNotifications', JSON.stringify([newNotice, ...cleanedNotices].slice(0, 20)));
+      } catch (e) {}
+
       setRejectModal({ isOpen: false, orderId: null, reason: '' });
       triggerToast(`ปฏิเสธสลิป #${orderId} เรียบร้อยแล้ว (ออเดอร์จะซ่อนจนกว่าลูกค้าจะส่งใหม่)`, 'error');
     } catch (err) {
@@ -943,7 +980,7 @@ const DashboardPage = () => {
           });
 
           if (setOrders) {
-            setOrders(prev => prev.map(order => {
+            setOrders(prev => (prev || []).map(order => {
               if (String(order.id) === String(orderId)) {
                 return {
                   ...order,
@@ -969,7 +1006,9 @@ const DashboardPage = () => {
   const toggleStoreStatus = () => {
     const updated = !isStoreOpen;
     setIsStoreOpen(updated);
-    localStorage.setItem('storeServiceStatus', JSON.stringify(updated));
+    try {
+      localStorage.setItem('storeServiceStatus', JSON.stringify(updated));
+    } catch (e) {}
     triggerToast(updated ? 'เปิดระบบรับออเดอร์แล้ว' : 'ปิดระบบรับออเดอร์ชั่วคราวแล้ว', updated ? 'success' : 'info');
   };
 
@@ -983,7 +1022,9 @@ const DashboardPage = () => {
       triggerToast(`บันทึกวันหยุดวันที่ ${dateStr} เรียบร้อยแล้ว`);
     }
     setClosedDates(updated);
-    localStorage.setItem('closedDates', JSON.stringify(updated));
+    try {
+      localStorage.setItem('closedDates', JSON.stringify(updated));
+    } catch (e) {}
   };
 
   const handleLogout = () => {
@@ -1214,7 +1255,7 @@ const DashboardPage = () => {
               )}
             </button>
 
-            {/* แท็บเดี่ยว: รวมออเดอร์กำลังดำเนินการ (In Progress) และซักอบผ้า */}
+            {/* ออเดอร์กำลังดำเนินการ */}
             <button
               onClick={() => handleTabChange('in_progress')}
               className={`w-full flex items-center ${isSidebarOpen ? 'justify-between px-3.5' : 'justify-center px-0'} py-3 rounded-2xl text-sm font-bold transition cursor-pointer relative group ${
@@ -1234,7 +1275,7 @@ const DashboardPage = () => {
               )}
             </button>
 
-            {/* แท็บ: จัดการไรเดอร์และสถิติงาน */}
+            {/* จัดการไรเดอร์และสถิติงาน */}
             <button
               onClick={() => handleTabChange('riders')}
               className={`w-full flex items-center ${isSidebarOpen ? 'justify-between px-3.5' : 'justify-center px-0'} py-3 rounded-2xl text-sm font-bold transition cursor-pointer relative group ${
@@ -1252,7 +1293,7 @@ const DashboardPage = () => {
               )}
             </button>
 
-            {/* แท็บ: ปรับโครงสร้างราคา */}
+            {/* ปรับโครงสร้างราคา */}
             <button
               onClick={() => handleTabChange('pricing')}
               className={`w-full flex items-center ${isSidebarOpen ? 'gap-3 px-3.5' : 'justify-center px-0'} py-3 rounded-2xl text-sm font-bold transition cursor-pointer relative group ${
@@ -1315,7 +1356,7 @@ const DashboardPage = () => {
               {isSidebarOpen && <span className="truncate">สรุปรายรับ &amp; กราฟ</span>}
             </button>
 
-            {/* แท็บ: สถิติลูกค้าและการใช้งานต่อปี */}
+            {/* สถิติดูแลลูกค้าต่อปี */}
             <button
               onClick={() => handleTabChange('customers')}
               className={`w-full flex items-center ${isSidebarOpen ? 'gap-3 px-3.5' : 'justify-center px-0'} py-3 rounded-2xl text-sm font-bold transition cursor-pointer relative group ${
@@ -1602,7 +1643,7 @@ const DashboardPage = () => {
             </div>
           )}
 
-          {/* ======================= แท็บ 2: ออเดอร์กำลังดำเนินการ (In Progress) ======================= */}
+          {/* ======================= แท็บ 2: ออเดอร์กำลังดำเนินการ ======================= */}
           {activeTab === 'in_progress' && (
             <div className="space-y-6">
               <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden p-6">
@@ -1947,7 +1988,7 @@ const DashboardPage = () => {
                 </div>
               </div>
 
-              {/* ความต้องการพิเศษ: หมวดซัก อบ พับ */}
+              {/* ความต้องการพิเศษ: ซัก อบ พับ */}
               <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
                 <h4 className="font-bold text-sm text-slate-900">3. ความต้องการพิเศษ: หมวดซัก อบ พับ (ผ้าเฉพาะทาง)</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
@@ -1972,7 +2013,7 @@ const DashboardPage = () => {
                 </div>
               </div>
 
-              {/* ความต้องการพิเศษ: หมวดเครื่องนอนแยกชิ้น */}
+              {/* ความต้องการพิเศษ: เครื่องนอน */}
               <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
                 <h4 className="font-bold text-sm text-slate-900">4. ความต้องการพิเศษ: หมวดชุดเครื่องนอน (แยกชิ้น)</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
@@ -2205,7 +2246,7 @@ const DashboardPage = () => {
             </div>
           )}
 
-          {/* ======================= แท็บ 7: ออเดอร์ที่ถูกยกเลิก (แก้ปัญหาข้อความยาวล้น) ======================= */}
+          {/* ======================= แท็บ 7: ออเดอร์ที่ถูกยกเลิก ======================= */}
           {activeTab === 'cancelled' && (
             <div className="space-y-6">
               <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden p-6">
@@ -2294,7 +2335,6 @@ const DashboardPage = () => {
                               </span>
                             </td>
 
-                            {/* กล่องแสดงเหตุผลที่ปรับแก้: ไม่จำกัดความสูง บรรทัดตัดคำสวยงาม อ่านได้ครบถ้วน */}
                             <td className="py-4 px-5 align-middle text-slate-700 text-left">
                               <div 
                                 className="bg-red-50/40 border border-red-100 px-3.5 py-2 rounded-2xl text-xs font-medium text-slate-800 whitespace-normal break-words leading-relaxed max-w-lg shadow-2xs" 
@@ -2383,7 +2423,7 @@ const DashboardPage = () => {
                 </div>
               </div>
 
-              {/* กราฟสถิติรายรับ พร้อมตัวเลือกสลับดูช่วงเวลา */}
+              {/* กราฟสถิติรายรับ */}
               <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 flex flex-col gap-6">
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-100">
                   <div className="flex items-center gap-3">
@@ -2741,7 +2781,7 @@ const DashboardPage = () => {
             </div>
           )}
 
-          {/* ======================= แท็บ 10: ปฏิทินร้าน (Modern Interactive Calendar Grid) ======================= */}
+          {/* ======================= แท็บ 10: ปฏิทินร้าน ======================= */}
           {activeTab === 'calendar' && (() => {
             const curYear = new Date(selectedDate).getFullYear();
             const curMonth = new Date(selectedDate).getMonth();
@@ -2763,7 +2803,7 @@ const DashboardPage = () => {
             return (
               <div className="max-w-4xl space-y-6">
 
-                {/* 1. การ์ด Master Switch เปิด-ปิดระบบรับออเดอร์ทันที */}
+                {/* Master Switch */}
                 <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div className="flex items-start gap-4">
                     <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
@@ -2805,10 +2845,9 @@ const DashboardPage = () => {
                   </button>
                 </div>
 
-                {/* 2. การ์ดปฏิทินกำหนดวันหยุดแบบ Interactive Calendar Grid */}
+                {/* Calendar Grid */}
                 <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-6">
                   
-                  {/* Calendar Top Navigation */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-2xl bg-blue-50 text-[#1d61f2] flex items-center justify-center">
@@ -2824,7 +2863,6 @@ const DashboardPage = () => {
                       </div>
                     </div>
 
-                    {/* ตัวเลือกเดือน/ปี ดีไซน์โมเดิร์น */}
                     <div className="flex items-center gap-2.5">
                       <div className="relative inline-flex items-center">
                         <select
@@ -2927,7 +2965,7 @@ const DashboardPage = () => {
                     </div>
                   </div>
 
-                  {/* วันหยุดที่บันทึกไว้ในระบบ (Chip Tags) */}
+                  {/* วันหยุดที่บันทึกไว้ในระบบ */}
                   <div className="pt-2">
                     <div className="flex items-center justify-between mb-3">
                       <span className="text-xs font-bold text-slate-700 flex items-center gap-2">
