@@ -156,6 +156,26 @@ export default function OrderDetailPage() {
   const displayCreatedAt = order?.createdAt || '-';
   const displayDeliveredAt = order?.deliveredAt || (isCompleted ? 'ส่งมอบแล้ว' : '-');
 
+  // คำนวณยอดเงินรวมที่รองรับทุกชื่อฟิลด์
+  const resolvedTotalPrice = useMemo(() => {
+    if (!order) return 0;
+    return Number(order.totalPrice || order.total_price || order.price || order.amount || 0);
+  }, [order]);
+
+  // คำนวณราคาแพ็กเกจหลักให้ตรงกับความเป็นจริง
+  const resolvedPackagePrice = useMemo(() => {
+    if (!order) return 0;
+    if (order.basePrice || order.packagePrice) {
+      return Number(order.basePrice || order.packagePrice);
+    }
+    const specialSum = (order.specialItems || []).reduce((sum, item) => {
+      return sum + Number(item.total || (Number(item.price || 0) * Number(item.count || 0)));
+    }, 0);
+    const bagSum = Number(order.plasticBagPrice || (Number(order.plasticBagCount || 0) * 5));
+    const calculatedBase = resolvedTotalPrice - specialSum - bagSum;
+    return calculatedBase > 0 ? calculatedBase : resolvedTotalPrice;
+  }, [order, resolvedTotalPrice]);
+
   const steps = useMemo(() => {
     if (!order) return [];
     return [
@@ -487,7 +507,7 @@ export default function OrderDetailPage() {
                         <span className="text-[11px] text-slate-500">{order.packageName}</span>
                       </div>
                       <span className="font-bold text-slate-900 shrink-0">
-                        {Number(order.basePrice || order.packagePrice || order.price || 0).toLocaleString()} ฿
+                        {resolvedPackagePrice.toLocaleString()} ฿
                       </span>
                     </div>
                   )}
@@ -526,7 +546,7 @@ export default function OrderDetailPage() {
               <div className="flex justify-between items-center pt-2 border-t border-dashed border-slate-200">
                 <span className="font-bold text-xs text-slate-700">ยอดชำระสุทธิ</span>
                 <span className="font-bold text-base text-slate-900">
-                  {Number(order.totalPrice || order.price || 0).toLocaleString()} บาท
+                  {resolvedTotalPrice.toLocaleString()} บาท
                 </span>
               </div>
 
