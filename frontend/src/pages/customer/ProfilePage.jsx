@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { 
   User, 
@@ -872,15 +873,38 @@ export default function ProfilePage() {
 
         </div>
 
-        {/* Modal ที่อยู่ Google Maps (แก้ไข Layer และเปิดสิทธิ์ Pointer Events ให้พิมพ์และกดยืนยันได้แน่นอน) */}
-        {showAddressModal && (
-          <div className="fixed inset-0 z-50 bg-black/80 flex items-end sm:items-center justify-center backdrop-blur-xs">
+        {/* Modal ที่อยู่ Google Maps (ใช้ createPortal ส่งออกไปติด body โดยตรง ไม่โดน BottomNav บัง 100%) */}
+        {showAddressModal && typeof document !== 'undefined' && createPortal(
+          <div 
+            style={{ 
+              position: 'fixed', 
+              inset: 0, 
+              zIndex: 999999,
+              backgroundColor: 'rgba(0, 0, 0, 0.85)',
+              display: 'flex',
+              alignItems: 'flex-end',
+              justifyContent: 'center',
+              backdropFilter: 'blur(4px)'
+            }}
+          >
             <div 
-              style={{ height: '94dvh', maxHeight: '94dvh' }}
-              className="bg-white w-full max-w-[430px] rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden relative animate-in slide-in-from-bottom duration-200"
+              style={{ 
+                width: '100vw', 
+                maxWidth: '430px', 
+                height: '92dvh', 
+                maxHeight: '92dvh',
+                backgroundColor: '#ffffff',
+                borderTopLeftRadius: '28px',
+                borderTopRightRadius: '28px',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+                boxShadow: '0 -20px 40px rgba(0,0,0,0.3)',
+                position: 'relative'
+              }}
             >
               {/* Header */}
-              <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white z-20">
+              <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
                 <div>
                   <h3 className="font-bold text-sm text-slate-900 flex items-center gap-1.5">
                     <MapPin size={17} className="text-[#1d61f2]" />
@@ -897,7 +921,7 @@ export default function ProfilePage() {
                 </button>
               </div>
 
-              {/* ส่วนบน: Search + Google Map (Fixed Area) */}
+              {/* ส่วนบน: Search + แผนที่ Google Map */}
               <div className="shrink-0 flex flex-col bg-slate-100 border-b border-slate-200">
                 <div className="px-3.5 py-2 bg-slate-50 border-b border-slate-100 relative z-30">
                   <form onSubmit={handleDirectSearch} className="relative flex gap-2">
@@ -948,7 +972,7 @@ export default function ProfilePage() {
                   </form>
                 </div>
 
-                <div className="relative w-full h-[200px] bg-slate-100 shrink-0">
+                <div className="relative w-full h-[190px] bg-slate-100 shrink-0">
                   {isLoaded && addressCoords ? (
                     <GoogleMap
                       mapContainerStyle={{ width: '100%', height: '100%' }}
@@ -1023,7 +1047,7 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              {/* ส่วนฟอร์มกรอกข้อมูล: มี form tag และ trigger submit ชัดเจน */}
+              {/* ส่วนฟอร์มกรอกข้อมูล: Scrollable Form ที่อยู่นอก Container ปกติ */}
               <form 
                 onSubmit={handleSaveAddress}
                 className="flex-1 min-h-0 flex flex-col bg-white overflow-hidden"
@@ -1034,7 +1058,7 @@ export default function ProfilePage() {
                 >
                   <div>
                     <label className="text-xs font-bold text-slate-700 block mb-1">
-                      ชื่อสถานที่เรียกง่าย[cite: 2] <span className="text-red-500">*</span>
+                      ชื่อสถานที่เรียกง่าย <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
@@ -1042,13 +1066,13 @@ export default function ProfilePage() {
                       placeholder="เช่น บ้าน, คอนโด A, หอพัก..."
                       value={addressTitle}
                       onChange={(e) => setAddressTitle(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-[#1d61f2] focus:bg-white transition cursor-text pointer-events-auto"
+                      className="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-[#1d61f2] focus:bg-white"
                     />
                   </div>
 
                   <div>
                     <label className="text-xs font-bold text-slate-700 block mb-1">
-                      รายละเอียดที่อยู่ (บ้านเลขที่ / เลขห้อง / อาคาร / ซอย)[cite: 2] <span className="text-red-500">*</span>
+                      รายละเอียดที่อยู่ (บ้านเลขที่ / เลขห้อง / อาคาร / ซอย) <span className="text-red-500">*</span>
                     </label>
                     <textarea
                       rows="3"
@@ -1056,41 +1080,42 @@ export default function ProfilePage() {
                       placeholder="เช่น 123/45 ซอยอ่อนนุช 25 อาคาร B ห้อง 301..."
                       value={addressDetail}
                       onChange={(e) => setAddressDetail(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-[#1d61f2] focus:bg-white resize-none transition cursor-text pointer-events-auto"
+                      className="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-[#1d61f2] focus:bg-white resize-none"
                     ></textarea>
                   </div>
                 </div>
 
-                {/* แถบปุ่ม Action ด้านล่างสุด */}
-                <div className="p-3 bg-white border-t border-slate-100 flex gap-2 shrink-0 z-30 shadow-lg">
+                {/* แถบปุ่ม Action ด้านล่างสุด (ลอยอยู่เหนือทุกอย่าง ไม่มีทางโดน BottomNav บัง) */}
+                <div className="p-4 bg-white border-t border-slate-100 flex gap-2 shrink-0 shadow-lg">
                   <button 
                     type="button" 
                     onClick={() => setShowAddressModal(false)} 
-                    className="py-3 px-4 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs cursor-pointer hover:bg-slate-50 active:scale-95 transition"
+                    className="py-3 px-4 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs cursor-pointer hover:bg-slate-50"
                   >
-                    ยกเลิก[cite: 2]
+                    ยกเลิก
                   </button>
                   <button 
                     type="submit"
                     disabled={!isWithinRange}
-                    className={`flex-1 py-3 rounded-xl font-bold text-xs transition cursor-pointer shadow-md active:scale-98 ${
+                    className={`flex-1 py-3 rounded-xl font-bold text-xs transition cursor-pointer shadow-md ${
                       isWithinRange 
-                        ? 'bg-[#1d61f2] hover:bg-blue-700 text-white shadow-blue-500/20' 
+                        ? 'bg-[#1d61f2] hover:bg-blue-700 active:scale-98 text-white shadow-blue-500/20' 
                         : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
                     }`}
                   >
-                    {isWithinRange ? 'ยืนยันปักหมุดตำแหน่งนี้' : 'อยู่นอกเขตให้บริการ 3 กม.'}[cite: 2]
+                    {isWithinRange ? 'ยืนยันปักหมุดตำแหน่งนี้' : 'อยู่นอกเขตให้บริการ 3 กม.'}
                   </button>
                 </div>
               </form>
 
             </div>
-          </div>
+          </div>,
+          document.body
         )}
 
-        {/* Modal แก้ไขข้อมูลส่วนตัว + OTP (เรนเดอร์เฉพาะเมื่อเปิดใช้งาน) */}
-        {showEditProfileModal && (
-          <div className="fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-6 backdrop-blur-xs">
+        {/* Modal แก้ไขข้อมูลส่วนตัว + OTP */}
+        {showEditProfileModal && typeof document !== 'undefined' && createPortal(
+          <div style={{ position: 'fixed', inset: 0, zIndex: 999999, backgroundColor: 'rgba(15, 23, 42, 0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', backdropFilter: 'blur(4px)' }}>
             <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl flex flex-col gap-4 border border-slate-100">
               <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                 <h3 className="font-bold text-base text-slate-900">
@@ -1218,12 +1243,13 @@ export default function ProfilePage() {
                 </form>
               )}
             </div>
-          </div>
+          </div>,
+          document.body
         )}
 
-        {/* Modal แจ้งเรื่องร้องเรียน (เรนเดอร์เฉพาะเมื่อเปิดใช้งาน) */}
-        {showReportModal && (
-          <div className="fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-6 backdrop-blur-xs">
+        {/* Modal แจ้งเรื่องร้องเรียน */}
+        {showReportModal && typeof document !== 'undefined' && createPortal(
+          <div style={{ position: 'fixed', inset: 0, zIndex: 999999, backgroundColor: 'rgba(15, 23, 42, 0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', backdropFilter: 'blur(4px)' }}>
             <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl flex flex-col gap-3.5 border border-slate-100">
               <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                 <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
@@ -1281,12 +1307,13 @@ export default function ProfilePage() {
                 </form>
               )}
             </div>
-          </div>
+          </div>,
+          document.body
         )}
 
-        {/* Confirmation Modal (ย้ายมาไว้ล่างสุดและเปิดเฉพาะเมื่อสั่งเปิด) */}
-        {confirmModal.isOpen && (
-          <div className="fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-6 backdrop-blur-xs animate-in fade-in duration-150">
+        {/* Confirmation Modal */}
+        {confirmModal.isOpen && typeof document !== 'undefined' && createPortal(
+          <div style={{ position: 'fixed', inset: 0, zIndex: 999999, backgroundColor: 'rgba(15, 23, 42, 0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', backdropFilter: 'blur(4px)' }}>
             <div className="bg-white w-full max-w-xs rounded-3xl p-6 shadow-2xl flex flex-col gap-4 text-center border border-slate-100 animate-in zoom-in-95 duration-150">
               <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mx-auto ${
                 confirmModal.iconType === 'logout' 
@@ -1324,7 +1351,8 @@ export default function ProfilePage() {
                 </button>
               </div>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
 
         <BottomNav />
