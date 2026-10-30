@@ -48,6 +48,7 @@ export default function PaymentPage() {
   // State สำหรับ PromptPay QR Code จริงจาก Backend
   const [qrCodeUrl, setQrCodeUrl] = useState('');
   const [isQrLoading, setIsQrLoading] = useState(false);
+  const [isDownloadingQr, setIsDownloadingQr] = useState(false);
 
   const [alertModal, setAlertModal] = useState({ isOpen: false, title: '', message: '' });
 
@@ -72,7 +73,6 @@ export default function PaymentPage() {
         if (res && res.qrCodeUrl) {
           setQrCodeUrl(res.qrCodeUrl);
         } else {
-          // แผนสำรองกรณี API ไม่คืนรูปภาพ
           setQrCodeUrl(`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=PROMPTPAY_NN_LAUNDROMAT_ORDER_${orderData.id}_AMOUNT_${payableAmount}THB`);
         }
       } catch (err) {
@@ -92,14 +92,43 @@ export default function PaymentPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleDownloadQr = () => {
+  // ฟังก์ชันบันทึกภาพ QR Code ที่รองรับทั้งมือถือ (iOS/Android) และคอมพิวเตอร์
+  const handleDownloadQr = async () => {
     if (!qrCodeUrl || !orderData) return;
-    const link = document.createElement('a');
-    link.href = qrCodeUrl;
-    link.download = `QR_NN_Laundromat_${orderData.id}.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+
+    try {
+      setIsDownloadingQr(true);
+
+      const response = await fetch(qrCodeUrl);
+      const blob = await response.blob();
+      const fileName = `QR_NN_Laundromat_${orderData.id || 'Payment'}.png`;
+      const file = new File([blob], fileName, { type: blob.type || 'image/png' });
+
+      // หากเป็นสมาร์ทโฟนและรองรับ Web Share API ให้เปิดเมนู Save Image หรือแชร์
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: 'QR Code ชำระเงิน N&N Laundromat',
+          text: `สแกน QR Code เพื่อชำระเงินยอด ${payableAmount} บาท`,
+        });
+        return;
+      }
+
+      // Fallback สำหรับคอมพิวเตอร์ หรือเบราว์เซอร์ที่ไม่รองรับ Share API
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error('Error downloading QR Code:', error);
+      showAlert('บันทึกภาพไม่สำเร็จ', 'หากระบบไม่อนุญาตให้ดาวน์โหลดอัตโนมัติ กรุณากดแตะค้างที่รูปภาพ QR Code แล้วเลือก "บันทึกรูปภาพ"');
+    } finally {
+      setIsDownloadingQr(false);
+    }
   };
 
   const handleSlipChange = (e) => {
@@ -126,9 +155,7 @@ export default function PaymentPage() {
       setIsSubmitting(true);
 
       if (isRetry) {
-        // ==========================================
         // 1. กรณี: ส่งสลิปใหม่เพื่อให้อนุมัติใหม่ (Retry Flow)
-        // ==========================================
         await updateOrder(orderData.id, {
           paymentVerified: false,
           paymentRejected: false,
@@ -173,9 +200,7 @@ export default function PaymentPage() {
         }
 
       } else {
-        // ==========================================
         // 2. กรณี: สร้างออเดอร์ใหม่ครั้งแรก (ยิงลง MySQL จริง)
-        // ==========================================
         const orderPayload = {
           id: orderData.id,
           customerName: orderData.customerName || customerName,
@@ -307,7 +332,7 @@ export default function PaymentPage() {
                   <span className="text-[11px] font-bold text-slate-900 block">รายการความต้องการพิเศษ:</span>
                   {orderData.specialItems.map(item => (
                     <div key={item.id} className="flex justify-between text-[11px] text-slate-800">
-                      <span>• {item.name} x {item.count}</span>
+                      <span>{item.name} x {item.count}</span>
                       <span className="font-bold">{item.total}฿</span>
                     </div>
                   ))}
@@ -389,21 +414,25 @@ export default function PaymentPage() {
                     <img
                       src={qrCodeUrl}
                       alt="PromptPay QR Code"
-                      className="w-48 h-48 object-contain rounded-xl"
+                      className="w-48 h-48 object-contain rounded-xl select-all pointer-events-auto"
                     />
                   ) : (
                     <div className="text-xs text-slate-400 py-10">ไม่สามารถโหลด QR Code ได้</div>
                   )}
                 </div>
+
                 <button
                   type="button"
                   onClick={handleDownloadQr}
-                  disabled={!qrCodeUrl || isQrLoading}
-                  className="flex items-center gap-2 text-xs font-bold text-[#1d61f2] bg-blue-50 px-4 py-2 rounded-xl border border-blue-100 hover:bg-blue-100 transition cursor-pointer disabled:opacity-50"
+                  disabled={!qrCodeUrl || isQrLoading || isDownloadingQr}
+                  className="flex items-center gap-2 text-xs font-bold text-[#1d61f2] bg-blue-50 px-4 py-2.5 rounded-xl border border-blue-100 hover:bg-blue-100 active:scale-95 transition cursor-pointer disabled:opacity-50"
                 >
-                  <Download size={14} />
-                  บันทึกรูป QR Code
+                  {isDownloadingQr ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                  {isDownloadingQr ? 'กำลังบันทึกภาพ...' : 'บันทึกรูป QR Code'}
                 </button>
+                <span className="text-[10.5px] text-slate-400 mt-2 block">
+                  (หรือแตะค้างที่รูปภาพ QR Code เพื่อกดบันทึกภาพได้เช่นกัน)
+                </span>
               </>
             ) : (
               <div className="w-full text-left space-y-3">
