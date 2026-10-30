@@ -66,11 +66,7 @@ export const login = async (req, res) => {
       const cleanPhone = normalizePhone(rawIdentifier);
 
       const [riders] = await pool.query(
-        `SELECT rider_id AS id, name, phone_number, password 
-         FROM Rider 
-         WHERE rider_id = ? 
-            OR phone_number = ? 
-            OR REPLACE(REPLACE(phone_number, '-', ''), ' ', '') = ?`,
+        'SELECT rider_id AS id, name, phone_number, password FROM Rider WHERE rider_id = ? OR phone_number = ? OR phone_number = ?',
         [rawIdentifier, rawIdentifier, cleanPhone]
       );
 
@@ -95,12 +91,8 @@ export const login = async (req, res) => {
     const cleanPhone = normalizePhone(rawIdentifier);
 
     const [customers] = await pool.query(
-      `SELECT customer_id AS id, name, phone_number, password, address 
-       FROM Customer 
-       WHERE phone_number = ? 
-          OR phone_number = ? 
-          OR REPLACE(REPLACE(phone_number, '-', ''), ' ', '') = ?`,
-      [rawIdentifier, cleanPhone, cleanPhone]
+      'SELECT customer_id AS id, name, phone_number, password, address FROM Customer WHERE phone_number = ? OR phone_number = ?',
+      [rawIdentifier, cleanPhone]
     );
 
     if (customers.length === 0) {
@@ -144,15 +136,14 @@ export const register = async (req, res) => {
     }
 
     const cleanName = String(name).trim();
-    const cleanPhone = normalizePhone(phone_number);
+    const rawPhone = String(phone_number).trim();
+    const cleanPhone = normalizePhone(rawPhone);
     const cleanPassword = String(password).trim();
     const cleanAddress = address ? String(address).trim() : '';
 
     const [existing] = await pool.query(
-      `SELECT customer_id FROM Customer 
-       WHERE phone_number = ? 
-          OR REPLACE(REPLACE(phone_number, '-', ''), ' ', '') = ?`,
-      [cleanPhone, cleanPhone]
+      'SELECT customer_id FROM Customer WHERE phone_number = ? OR phone_number = ?',
+      [rawPhone, cleanPhone]
     );
 
     if (existing.length > 0) {
@@ -191,16 +182,14 @@ export const forgotPassword = async (req, res) => {
       return res.status(400).json({ message: 'กรุณาระบุเบอร์โทรศัพท์และรหัสผ่านใหม่' });
     }
 
-    const cleanPhone = normalizePhone(phone_number);
+    const rawPhone = String(phone_number).trim();
+    const cleanPhone = normalizePhone(rawPhone);
     const cleanNewPassword = String(new_password).trim();
     const table = role === 'rider' ? 'Rider' : 'Customer';
 
     const [result] = await pool.query(
-      `UPDATE ${table} 
-       SET password = ? 
-       WHERE phone_number = ? 
-          OR REPLACE(REPLACE(phone_number, '-', ''), ' ', '') = ?`,
-      [cleanNewPassword, cleanPhone, cleanPhone]
+      `UPDATE ${table} SET password = ? WHERE phone_number = ? OR phone_number = ?`,
+      [cleanNewPassword, rawPhone, cleanPhone]
     );
 
     if (result.affectedRows === 0) {
@@ -218,14 +207,12 @@ export const forgotPassword = async (req, res) => {
 export const getProfile = async (req, res) => {
   try {
     const { phone } = req.params;
-    const cleanPhone = normalizePhone(phone);
+    const rawPhone = String(phone).trim();
+    const cleanPhone = normalizePhone(rawPhone);
 
     const [customers] = await pool.query(
-      `SELECT customer_id AS id, name, phone_number AS phone, address 
-       FROM Customer 
-       WHERE phone_number = ? 
-          OR REPLACE(REPLACE(phone_number, '-', ''), ' ', '') = ?`,
-      [cleanPhone, cleanPhone]
+      'SELECT customer_id AS id, name, phone_number AS phone, address FROM Customer WHERE phone_number = ? OR phone_number = ?',
+      [rawPhone, cleanPhone]
     );
 
     if (customers.length === 0) {
@@ -245,18 +232,15 @@ export const updateProfile = async (req, res) => {
     const { phone } = req.params;
     const { name, address, new_phone, phone_number, customer_id } = req.body;
     
-    const cleanCurrentPhone = normalizePhone(phone);
+    const rawPhone = String(phone).trim();
+    const cleanCurrentPhone = normalizePhone(rawPhone);
     const targetCandidate = new_phone || phone_number;
     const cleanNewPhone = targetCandidate ? normalizePhone(targetCandidate) : cleanCurrentPhone;
 
     // 1. ตรวจสอบว่าพบบัญชีเดิมหรือไม่
     const [currentUser] = await pool.query(
-      `SELECT customer_id, name, phone_number, address 
-       FROM Customer 
-       WHERE customer_id = ? 
-          OR phone_number = ? 
-          OR REPLACE(REPLACE(phone_number, '-', ''), ' ', '') = ?`,
-      [customer_id || 0, cleanCurrentPhone, cleanCurrentPhone]
+      'SELECT customer_id, name, phone_number, address FROM Customer WHERE customer_id = ? OR phone_number = ? OR phone_number = ?',
+      [customer_id || 0, rawPhone, cleanCurrentPhone]
     );
 
     if (currentUser.length === 0) {
@@ -269,10 +253,8 @@ export const updateProfile = async (req, res) => {
     // 2. ถ้าเปลี่ยนเบอร์ ต้องตรวจก่อนว่าบัญชีอื่นถือเบอร์นี้อยู่หรือไม่
     if (cleanNewPhone && cleanNewPhone !== normalizePhone(targetCustomer.phone_number)) {
       const [duplicateCheck] = await pool.query(
-        `SELECT customer_id FROM Customer 
-         WHERE (phone_number = ? OR REPLACE(REPLACE(phone_number, '-', ''), ' ', '') = ?)
-           AND customer_id != ?`,
-        [cleanNewPhone, cleanNewPhone, targetCustomerId]
+        'SELECT customer_id FROM Customer WHERE (phone_number = ? OR phone_number = ?) AND customer_id != ?',
+        [targetCandidate, cleanNewPhone, targetCustomerId]
       );
 
       if (duplicateCheck.length > 0) {
