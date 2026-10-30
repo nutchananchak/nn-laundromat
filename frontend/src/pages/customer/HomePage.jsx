@@ -367,42 +367,37 @@ export default function HomePage() {
   };
 
   return (
-    <div 
-      style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
+    <div style={{
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      minHeight: '100vh',
+      minHeight: '100dvh',
+      backgroundColor: '#0f172a',
+      margin: 0,
+      padding: 0,
+    }}>
+      <div style={{
+        width: '100vw',
+        maxWidth: '430px',
         height: '100vh',
-        height: '100dvh',
-        backgroundColor: '#0f172a',
-        margin: 0,
-        padding: 0,
-        overflow: 'hidden'
-      }}
-    >
-      <div 
-        style={{
-          width: '100vw',
-          maxWidth: '430px',
-          height: '100vh',
-          height: '100dvh',
-          backgroundColor: '#f8fafc',
-          display: 'flex',
-          flexDirection: 'column',
-          position: 'relative',
-          overflow: 'hidden',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-        }} 
-        className="font-body text-base"
-      >
+        maxHeight: '100vh',
+        backgroundColor: '#f8fafc',
+        display: 'flex',
+        flexDirection: 'column',
+        position: 'relative',
+        overflowX: 'hidden',
+        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+      }} className="font-body text-base">
 
-        {/* 1. Top Bar (อยู่กับที่ด้านบนเสมอ shrink-0) */}
+        {/* 1. Top Bar */}
         <div 
           style={{
             background: 'linear-gradient(135deg, #1d61f2 0%, #1045b8 100%)',
             boxShadow: '0 10px 25px rgba(29, 97, 242, 0.25)',
+            flexShrink: 0
           }}
-          className="rounded-b-3xl px-5 pt-6 pb-5 flex items-center justify-between shrink-0 z-20 text-white"
+          className="rounded-b-3xl px-6 pt-7 pb-6 flex items-center justify-between z-20 text-white"
         >
           <div 
             onClick={() => {
@@ -450,14 +445,8 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* 2. Scrollable Content (ส่วนเนื้อหาที่เลื่อนได้อย่างอิสระ flex-1 min-h-0 overflow-y-auto) */}
-        <div 
-          className="flex-1 min-h-0 overflow-y-auto px-5 py-4 pb-28 flex flex-col gap-4"
-          style={{ 
-            WebkitOverflowScrolling: 'touch',
-            overscrollBehaviorY: 'contain'
-          }}
-        >
+        {/* 2. Scrollable Content Body (ปรับ padding pb-28 และ px-6 py-5 ให้เท่ากับ ProfilePage เป๊ะ) */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 pb-28 flex flex-col gap-4">
 
           {/* ป้ายแจ้งเตือนสลิปไม่ผ่าน */}
           {isSlipRejected && (
@@ -925,7 +914,7 @@ export default function HomePage() {
 
         {/* Modal ยืนยันการยกเลิกออเดอร์ */}
         {showCancelModal && (
-          <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="absolute inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
             <div className="bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl flex flex-col gap-4 animate-in zoom-in-95 duration-150 border border-slate-100">
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <div>
@@ -996,7 +985,7 @@ export default function HomePage() {
 
         {/* Modal เลือกที่อยู่ */}
         {showAddressPicker && (
-          <div className="fixed inset-0 bg-slate-900/50 z-50 flex items-end justify-center backdrop-blur-xs">
+          <div className="absolute inset-0 bg-slate-900/50 z-50 flex items-end justify-center backdrop-blur-xs">
             <div className="bg-white w-full max-w-[430px] rounded-t-3xl p-5 shadow-2xl flex flex-col gap-4 animate-in slide-in-from-bottom duration-200">
               <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                 <div className="flex items-center gap-2">
@@ -1056,10 +1045,8 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* 3. BottomNav (วางอยู่นิ่งๆ ด้านล่างสุดเสมอ shrink-0) */}
-        <div className="shrink-0 z-30">
-          <BottomNav />
-        </div>
+        {/* 3. BottomNav (วางเป็นลูกตรงๆ ของ Frame นอกสุดแบบเดียวกับ ProfilePage) */}
+        <BottomNav />
       </div>
     </div>
   );
