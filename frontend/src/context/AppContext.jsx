@@ -2,6 +2,21 @@ import { createContext, useContext, useState, useEffect } from 'react';
 
 const AppContext = createContext();
 
+const stripImagesForStorage = (ordersList) => {
+  if (!ordersList || !Array.isArray(ordersList)) return [];
+  return ordersList.slice(0, 15).map(o => ({
+    ...o,
+    slipImage: null,
+    paymentSlip: null,
+    riderBasketImage: null,
+    riderPickupImage: null,
+    proofImage: null,
+    riderDeliveryImage: null,
+    basketImage: null,
+    customerBasketImage: null
+  }));
+};
+
 export function AppProvider({ children }) {
   // 1. ข้อมูลผู้ใช้ฝั่งลูกค้า (Customer)
   const [userProfile, setUserProfile] = useState(() => {
@@ -20,8 +35,6 @@ export function AppProvider({ children }) {
     } catch (e) {}
     return null;
   });
-
-  const userKey = userProfile?.phone || userProfile?.id || 'guest';
 
   const loginUser = (userData) => {
     const formattedUser = {
@@ -63,11 +76,10 @@ export function AppProvider({ children }) {
     localStorage.removeItem('currentRider');
   };
 
-  // 3. หมุดที่อยู่ลูกค้า: แยก Storage Key ตามผู้ใช้คนนั้นๆ
+  // 3. หมุดที่อยู่ลูกค้า
   const [addresses, setAddresses] = useState([]);
   const [selectedAddressId, setSelectedAddressId] = useState(null);
 
-  // ดึงที่อยู่เฉพาะของ User เมื่อสลับบัญชีหรือล็อกอิน
   useEffect(() => {
     if (!userProfile?.phone && !userProfile?.id) {
       setAddresses([]);
@@ -98,7 +110,6 @@ export function AppProvider({ children }) {
     }
   }, [userProfile?.phone, userProfile?.id]);
 
-  // ซิงค์ที่อยู่ลง localStorage แยกตาม Key ของ User นั้นๆ
   const updateAddressesForUser = (newList) => {
     if (!userProfile?.phone && !userProfile?.id) return;
     const currentKey = `addresses_${userProfile.phone || userProfile.id}`;
@@ -130,11 +141,16 @@ export function AppProvider({ children }) {
 
   useEffect(() => {
     try {
-      localStorage.setItem('orders', JSON.stringify(orders));
-    } catch (e) {}
+      // เซฟเฉพาะข้อมูลโครงสร้าง ตัดรูปขนาดใหญ่ออกทั้งหมด ป้องกัน QuotaExceededError
+      const safeOrders = stripImagesForStorage(orders);
+      localStorage.setItem('orders', JSON.stringify(safeOrders));
+    } catch (e) {
+      try {
+        localStorage.removeItem('orders');
+      } catch (err) {}
+    }
   }, [orders]);
 
-  // ดึงที่อยู่ที่เลือกใช้งานจริง
   const currentAddress = addresses.length > 0 
     ? (addresses.find(a => a.id === selectedAddressId) || addresses[0]) 
     : null;

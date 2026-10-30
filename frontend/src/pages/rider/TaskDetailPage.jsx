@@ -6,14 +6,15 @@ import {
   Phone, 
   Navigation, 
   Camera, 
-  Trash2,
+  Trash2, 
   Image as ImageIcon,
-  CheckCircle2,
-  AlertTriangle,
-  ExternalLink,
-  Info,
-  Layers,
-  ShoppingBag
+  CheckCircle2, 
+  AlertTriangle, 
+  ExternalLink, 
+  Info, 
+  Layers, 
+  ShoppingBag,
+  Loader2
 } from 'lucide-react';
 import { 
   GoogleMap, 
@@ -57,19 +58,13 @@ export default function TaskDetailPage() {
     }
   }, [activeRider, navigate]);
 
-  // ค้นหาออเดอร์เริ่มต้นจาก Context / State
   const [order, setOrder] = useState(() => (orders || []).find((o) => String(o.id) === String(id)));
 
-  // จัดการรูปหลักฐานที่ไรเดอร์ถ่าย:
-  // - Step 3 (กำลังไปรับผ้า): ว่างเสมอ รอไรเดอร์ถ่าย
-  // - Step 4-5 (รับผ้าเข้าสู่ร้านแล้ว): แสดงรูปที่ไรเดอร์ถ่ายตอนรับผ้า (riderPickupImage)
-  // - Step 6 (กำลังนำส่งคืนลูกค้า): ว่างเสมอ รอไรเดอร์ถ่ายส่งมอบ
-  // - Step 7 (ส่งมอบสำเร็จ): แสดงรูปส่งมอบ (proofImage หรือ riderDeliveryImage)
   const getInitialProofImage = (currentOrder) => {
     if (!currentOrder) return null;
     const step = Number(currentOrder.statusStep);
     if (step === 3) return null;
-    if (step >= 4 && step <= 5) return currentOrder.riderPickupImage || null;
+    if (step >= 4 && step <= 5) return currentOrder.riderPickupImage || currentOrder.rider_basket_image || null;
     if (step === 6) return null;
     if (step >= 7) return currentOrder.proofImage || currentOrder.riderDeliveryImage || null;
     return null;
@@ -87,7 +82,7 @@ export default function TaskDetailPage() {
           setProofImage(getInitialProofImage(found));
         }
       } catch (err) {
-        console.error(err);
+        console.error('Fetch order detail failed:', err);
       }
     };
 
@@ -114,7 +109,7 @@ export default function TaskDetailPage() {
         backgroundColor: '#f1f5f9'
       }}>
         <div className="bg-white p-6 rounded-2xl shadow-sm text-center max-w-xs mx-auto">
-          <p className="text-gray-700 font-bold text-sm mb-4">กำลังโหลดหรือค้นหาข้อมูลออเดอร์...</p>
+          <p className="text-gray-700 font-bold text-sm mb-4">กำลังโหลดข้อมูลออเดอร์...</p>
           <button
             onClick={() => navigate('/rider/tasks')}
             className="w-full py-2.5 bg-[#1d61f2] text-white text-xs font-bold rounded-xl cursor-pointer"
@@ -126,16 +121,10 @@ export default function TaskDetailPage() {
     );
   }
 
-  // รูปถ่ายจุดวางผ้าของลูกค้าตอนกดสั่งซื้อ
-  // ตรวจจับเฉพาะรูปของลูกค้า และกรองไม่ให้ดึงรูปที่ไรเดอร์ถ่าย (riderPickupImage) มาแสดงเด็ดขาด
   const customerBasketImage = (() => {
     const potentialImg = order.customerBasketImage || order.basketImage || order.customerBasketPhoto || order.basketPhoto;
     if (potentialImg && potentialImg !== order.riderPickupImage && potentialImg !== order.proofImage) {
       return potentialImg;
-    }
-    // กรณีที่เคยบันทึกลง riderBasketImage ตั้งแต่ต้น แต่ต้องไม่ตรงกับรูปหลักฐานรับผ้า
-    if (order.riderBasketImage && order.riderBasketImage !== order.riderPickupImage) {
-      return order.riderBasketImage;
     }
     return null;
   })();
@@ -164,13 +153,37 @@ export default function TaskDetailPage() {
     }
   };
 
+  // บีบอัดรูปถ่ายของไรเดอร์ผ่าน Canvas ไม่ให้ไฟล์ใหญ่เกิน 200 KB
   const handleImageCapture = (e) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setProofImage(reader.result);
-        triggerToast('บันทึกรูปถ่ายหน้างานเรียบร้อย');
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 800;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height && width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          const compressedImage = canvas.toDataURL('image/jpeg', 0.65);
+          setProofImage(compressedImage);
+          triggerToast('บันทึกรูปถ่ายหน้างานเรียบร้อย');
+        };
+        img.src = event.target.result;
       };
       reader.readAsDataURL(file);
     }
@@ -184,7 +197,7 @@ export default function TaskDetailPage() {
     triggerToast('ลบรูปถ่ายเรียบร้อยแล้ว', 'info');
   };
 
-  // เลื่อนสถานะงาน พร้อมบันทึกรูปถ่ายตรงเข้า Database
+  // เลื่อนสถานะงาน บันทึกลง MySQL ตรงๆ และตัด Base64 ออกจาก Storage
   const handleAdvanceStep = async (nextStep, nextTitle) => {
     const now = new Date();
     const d = new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }).format(now);
@@ -204,12 +217,10 @@ export default function TaskDetailPage() {
         deliveredAt: isDone ? realNowTimestamp : undefined
       };
 
-      // แยกฟิลด์รูปถ่ายของไรเดอร์อย่างชัดเจน:
-      // ตอนรับผ้า (Step 4): เก็บเฉพาะใน riderPickupImage (ไม่ทับ riderBasketImage ของลูกค้า)
       if (nextStep === 4 && proofImage) {
         updatePayload.riderPickupImage = proofImage;
+        updatePayload.riderBasketImage = proofImage;
       }
-      // ตอนส่งมอบผ้า (Step 7): เก็บใน proofImage และ riderDeliveryImage
       if (nextStep >= 6 && proofImage) {
         updatePayload.proofImage = proofImage;
         updatePayload.riderDeliveryImage = proofImage;
@@ -226,6 +237,7 @@ export default function TaskDetailPage() {
             status: isDone ? 'completed' : item.status,
             isCompleted: isDone,
             riderPickupImage: updatePayload.riderPickupImage || item.riderPickupImage,
+            riderBasketImage: updatePayload.riderBasketImage || item.riderBasketImage,
             proofImage: updatePayload.proofImage || item.proofImage,
             riderDeliveryImage: updatePayload.riderDeliveryImage || item.riderDeliveryImage,
             deliveredAt: isDone ? realNowTimestamp : item.deliveredAt,
@@ -238,7 +250,22 @@ export default function TaskDetailPage() {
       if (setOrders) {
         setOrders(updatedOrders);
       }
-      localStorage.setItem('orders', JSON.stringify(updatedOrders));
+
+      // Safe Cache: เก็บเฉพาะรายการจำเป็น ตัดรูป Base64 ออกเสมอ
+      try {
+        const safeCache = updatedOrders.slice(0, 10).map(o => ({
+          ...o,
+          slipImage: null,
+          riderBasketImage: null,
+          riderPickupImage: null,
+          proofImage: null,
+          riderDeliveryImage: null,
+          basketImage: null
+        }));
+        localStorage.setItem('orders', JSON.stringify(safeCache));
+      } catch (storageErr) {
+        localStorage.removeItem('orders');
+      }
 
       if (isDone) {
         try {
@@ -255,7 +282,7 @@ export default function TaskDetailPage() {
             type: 'delivery_success',
             isRead: false
           };
-          localStorage.setItem('customerNotifications', JSON.stringify([finishNotice, ...currentNotices]));
+          localStorage.setItem('customerNotifications', JSON.stringify([finishNotice, ...currentNotices].slice(0, 15)));
         } catch (e) {}
       }
 
@@ -265,7 +292,7 @@ export default function TaskDetailPage() {
       }, 700);
     } catch (err) {
       console.error(err);
-      triggerToast('เกิดข้อผิดพลาดในการบันทึกข้อมูล', 'error');
+      triggerToast('เกิดข้อผิดพลาดในการบันทึกข้อมูลลงฐานข้อมูล', 'error');
     } finally {
       setUpdating(false);
     }
@@ -349,7 +376,7 @@ export default function TaskDetailPage() {
             </span>
           </div>
 
-          {/* ข้อมูลลูกค้า และรอบเวลารับ-ส่งผ้า */}
+          {/* ข้อมูลลูกค้า */}
           <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-3">
             <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
               <div>
@@ -387,7 +414,7 @@ export default function TaskDetailPage() {
             )}
           </div>
 
-          {/* รายละเอียดบริการ & รายการผ้าในออเดอร์ */}
+          {/* รายละเอียดออเดอร์ */}
           <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-3">
             <div className="border-b border-gray-100 pb-2">
               <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
@@ -412,7 +439,7 @@ export default function TaskDetailPage() {
                   <span className="text-[11px] font-bold text-slate-800 block">รายการความต้องการพิเศษ (แยกชิ้น):</span>
                   {order.specialItems.map((item, idx) => (
                     <div key={idx} className="flex justify-between items-center text-[11px] text-slate-700">
-                      <span>• {item.name}</span>
+                      <span>{item.name}</span>
                       <span className="font-bold">{item.count} ชิ้น</span>
                     </div>
                   ))}
@@ -487,7 +514,7 @@ export default function TaskDetailPage() {
             </button>
           </div>
 
-          {/* รูปถ่ายจุดวางผ้าจากลูกค้าตอนสั่งซื้อ (ภาพต้นทางของลูกค้า) */}
+          {/* รูปถ่ายจุดวางผ้าจากลูกค้าตอนสั่งซื้อ */}
           <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-2.5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
@@ -564,7 +591,7 @@ export default function TaskDetailPage() {
                   <Camera size={22} />
                 </div>
                 <span className="text-xs font-bold text-slate-700">
-                  {Number(order.statusStep) >= 6 ? 'แตะเพื่อถ่ายรูปผ้าที่แขวน/ส่งมอบหน้าบ้านลูกค้า' : 'แตะเพื่อถ่ายรูปตะกร้าผ้าที่รับมา'}
+                  {Number(order.statusStep) >= 6 ? 'แตะเพื่อถ่ายรูปผ้าที่ส่งมอบหน้าห้องพัก' : 'แตะเพื่อถ่ายรูปตะกร้าผ้าที่รับมา'}
                 </span>
                 <span className="text-[10px] text-slate-400">
                   {Number(order.statusStep) >= 6 ? '*จำเป็นต้องถ่ายรูปก่อนกดยืนยันส่งมอบ' : 'ใช้เป็นหลักฐานยืนยันการรับผ้า'}
@@ -581,8 +608,9 @@ export default function TaskDetailPage() {
               type="button"
               disabled={updating}
               onClick={() => handleAdvanceStep(4, 'รับผ้าเข้าสู่ร้านเรียบร้อย')}
-              className="w-full py-3 rounded-xl bg-[#1d61f2] text-white font-bold text-xs shadow-md shadow-blue-500/20 hover:bg-blue-700 active:scale-[0.99] cursor-pointer transition disabled:opacity-50"
+              className="w-full py-3 rounded-xl bg-[#1d61f2] text-white font-bold text-xs shadow-md shadow-blue-500/20 hover:bg-blue-700 active:scale-[0.99] cursor-pointer transition disabled:opacity-50 flex items-center justify-center gap-2"
             >
+              {updating ? <Loader2 size={16} className="animate-spin" /> : null}
               {updating ? 'กำลังบันทึกลงระบบ...' : 'ยืนยันรับผ้าจากลูกค้า (นำส่งร้าน)'}
             </button>
           )}
@@ -592,8 +620,9 @@ export default function TaskDetailPage() {
               type="button"
               disabled={updating}
               onClick={() => handleAdvanceStep(5, 'ร้านกำลังดำเนินการซักอบ')}
-              className="w-full py-3 rounded-xl bg-blue-800 text-white font-bold text-xs shadow-md hover:bg-blue-900 active:scale-[0.99] cursor-pointer transition disabled:opacity-50"
+              className="w-full py-3 rounded-xl bg-blue-800 text-white font-bold text-xs shadow-md hover:bg-blue-900 active:scale-[0.99] cursor-pointer transition disabled:opacity-50 flex items-center justify-center gap-2"
             >
+              {updating ? <Loader2 size={16} className="animate-spin" /> : null}
               {updating ? 'กำลังบันทึกลงระบบ...' : 'ผ้าถึงร้านแล้ว (ส่งมอบแผนกซักอบ)'}
             </button>
           )}
@@ -610,8 +639,9 @@ export default function TaskDetailPage() {
                 }
                 handleAdvanceStep(7, 'จัดส่งผ้าคืนสำเร็จ');
               }}
-              className="w-full py-3 rounded-xl bg-emerald-600 text-white font-bold text-xs shadow-md shadow-emerald-600/20 hover:bg-emerald-700 active:scale-[0.99] cursor-pointer transition disabled:opacity-50"
+              className="w-full py-3 rounded-xl bg-emerald-600 text-white font-bold text-xs shadow-md shadow-emerald-600/20 hover:bg-emerald-700 active:scale-[0.99] cursor-pointer transition disabled:opacity-50 flex items-center justify-center gap-2"
             >
+              {updating ? <Loader2 size={16} className="animate-spin" /> : null}
               {updating ? 'กำลังบันทึกลงระบบ...' : 'ยืนยันส่งมอบผ้าคืนลูกค้าเรียบร้อย'}
             </button>
           )}

@@ -19,7 +19,6 @@ import {
 import { useApp } from '../../context/AppContext';
 import { fetchOrders } from '../../api/order';
 
-// โลโก้ทางการ N&N LAUNDROMAT DELIVERY
 const OfficialNnLogo = () => (
   <svg
     viewBox="0 0 240 240"
@@ -101,7 +100,7 @@ export default function OrderDetailPage() {
 
   const [isLoading, setIsLoading] = useState(true);
 
-  // ดึงข้อมูลออเดอร์สดจาก API จริง
+  // ดึงข้อมูลออเดอร์สดจาก API โดยไม่อัดรูป Base64 ลงใน localStorage
   useEffect(() => {
     const fetchLiveDetail = async () => {
       try {
@@ -109,7 +108,6 @@ export default function OrderDetailPage() {
         if (setOrders) {
           setOrders(liveList);
         }
-        localStorage.setItem('orders', JSON.stringify(liveList));
       } catch (err) {
         console.error('Failed to sync order detail from API:', err);
       } finally {
@@ -120,7 +118,6 @@ export default function OrderDetailPage() {
     fetchLiveDetail();
   }, [id, setOrders]);
 
-  // ค้นหาออเดอร์จริงจาก state หรือ cache
   const order = useMemo(() => {
     const list = orders && orders.length > 0 
       ? orders 
@@ -146,7 +143,6 @@ export default function OrderDetailPage() {
     }
   }, [location.state, isCompleted]);
 
-  // นำข้อมูลผู้ส่งมอบ/ไรเดอร์จริงจาก Database มาใช้งาน
   const riderInfo = useMemo(() => {
     if (!order) return null;
     return {
@@ -192,11 +188,9 @@ export default function OrderDetailPage() {
       const viewed = JSON.parse(localStorage.getItem('viewed_completed_orders') || '[]');
       if (!viewed.includes(orderIdStr)) {
         const nextViewed = [...viewed, orderIdStr];
-        localStorage.setItem('viewed_completed_orders', JSON.stringify(nextViewed));
+        localStorage.setItem('viewed_completed_orders', JSON.stringify(nextViewed.slice(0, 15)));
       }
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) {}
     navigate('/home');
   };
 
@@ -288,7 +282,7 @@ export default function OrderDetailPage() {
           </div>
         </div>
 
-        {/* ================= แบบที่ 1: กำลังดำเนินการ (Step 1-6) ================= */}
+        {/* แบบที่ 1: กำลังดำเนินการ (Step 1-6) */}
         {!isCompleted ? (
           <div className="flex-1 overflow-y-auto px-5 py-5 pb-32 flex flex-col gap-4">
             
@@ -307,7 +301,7 @@ export default function OrderDetailPage() {
               </div>
             </div>
 
-            {/* ภาพถ่ายยืนยันจากไรเดอร์ตอนรับผ้า (จะแสดงเมื่อ Step >= 4 และมีรูปถ่ายจริงจากไรเดอร์เท่านั้น) */}
+            {/* ภาพถ่ายยืนยันจากไรเดอร์ตอนรับผ้า */}
             {currentStep >= 4 && (order.riderPickupImage || order.riderBasketImage) ? (
               <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-xs flex flex-col gap-2.5">
                 <div className="flex items-center justify-between">
@@ -435,12 +429,11 @@ export default function OrderDetailPage() {
 
           </div>
         ) : (
-          /* ================= แบบที่ 2: ใบเสร็จรับเงิน (Step 7 ส่งสำเร็จแล้ว) ================= */
+          /* แบบที่ 2: ใบเสร็จรับเงิน (Step 7 ส่งสำเร็จแล้ว) */
           <div className="flex-1 overflow-y-auto px-5 py-5 pb-32 flex flex-col gap-4">
             
             <div className="bg-white rounded-3xl p-6 shadow-xs border border-slate-200 flex flex-col gap-4 relative">
               
-              {/* หัวใบเสร็จพร้อมโลโก้ทางการ */}
               <div className="flex flex-col items-center text-center pb-4 border-b border-dashed border-slate-200">
                 <div className="mb-2">
                   <OfficialNnLogo />
