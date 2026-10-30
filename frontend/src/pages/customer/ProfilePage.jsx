@@ -364,7 +364,7 @@ export default function ProfilePage() {
   };
 
   const handleSaveAddress = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     if (!addressTitle.trim() || !addressDetail.trim() || !addressCoords) {
       showToast('กรุณากรอกข้อมูลที่อยู่ให้ครบถ้วน', 'error');
       return;
@@ -465,7 +465,6 @@ export default function ProfilePage() {
     }
   };
 
-  // 1. ตรวจสอบการเปลี่ยนเบอร์และขอ OTP ส่ง SMS ผ่าน Thaibulksms
   const handleInitiateProfileSave = async (e) => {
     e.preventDefault();
     const trimmedName = editName.trim();
@@ -503,7 +502,6 @@ export default function ProfilePage() {
     finalizeProfileUpdate(trimmedName, trimmedPhone);
   };
 
-  // 2. ตรวจสอบ OTP กับ Backend จริง
   const handleVerifyOtpAndSave = async (e) => {
     e.preventDefault();
     if (!inputOtp.trim()) {
@@ -524,7 +522,6 @@ export default function ProfilePage() {
     }
   };
 
-  // 3. บันทึกข้อมูลโปรไฟล์ลง MySQL และป้องกันการเขียนทับบัญชีอื่น
   const finalizeProfileUpdate = async (name, phone) => {
     try {
       const originalPhone = userProfile?.phone || '';
@@ -918,11 +915,12 @@ export default function ProfilePage() {
 
         </div>
 
-        {/* Modal ที่อยู่ Google Maps */}
+        {/* Modal ที่อยู่ Google Maps (ปรับโครงสร้างแยกส่วนปุ่ม Fixed ไว้ล่างสุด และเปิด Scroll ได้อย่างสมบูรณ์) */}
         {showAddressModal && (
-          <div className="absolute inset-0 bg-black/75 z-50 flex items-end sm:items-center justify-center backdrop-blur-xs">
+          <div className="fixed inset-0 bg-black/80 z-50 flex items-end sm:items-center justify-center backdrop-blur-xs">
             <div className="bg-white w-full max-w-[430px] h-[92vh] max-h-[92vh] rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-200">
               
+              {/* Modal Header */}
               <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white z-20">
                 <div>
                   <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
@@ -931,12 +929,24 @@ export default function ProfilePage() {
                   </h3>
                   <span className="text-[11px] text-slate-400">เลื่อนแผนที่ให้เป้าตรงกับหน้าบ้าน/คอนโดของคุณ</span>
                 </div>
-                <button type="button" onClick={() => setShowAddressModal(false)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 cursor-pointer">
+                <button 
+                  type="button" 
+                  onClick={() => setShowAddressModal(false)} 
+                  className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 cursor-pointer"
+                >
                   <X size={16} />
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto flex flex-col">
+              {/* Scrollable Modal Body (ใส่ min-h-0 เพื่อให้รูดจอเลื่อนลงได้เสมอ) */}
+              <div 
+                className="flex-1 min-h-0 overflow-y-auto flex flex-col pb-4"
+                style={{ 
+                  WebkitOverflowScrolling: 'touch',
+                  overscrollBehavior: 'contain'
+                }}
+              >
+                {/* Search Bar */}
                 <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 shrink-0 sticky top-0 z-30">
                   <form onSubmit={handleDirectSearch} className="relative flex gap-2">
                     <div className="relative flex-1">
@@ -988,7 +998,8 @@ export default function ProfilePage() {
                   </form>
                 </div>
 
-                <div className="relative w-full h-80 min-h-[320px] shrink-0 bg-slate-100">
+                {/* Google Map Container (ปรับความสูงเป็น h-64 ให้พอดีมือ และไม่กินพื้นที่จอเกินไป) */}
+                <div className="relative w-full h-64 min-h-[250px] shrink-0 bg-slate-100">
                   {isLoaded && addressCoords ? (
                     <GoogleMap
                       mapContainerStyle={{ width: '100%', height: '100%' }}
@@ -1062,7 +1073,8 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                <form onSubmit={handleSaveAddress} className="p-4 bg-white flex flex-col gap-3">
+                {/* Form Fields Section */}
+                <div className="p-4 bg-white flex flex-col gap-3">
                   <div>
                     <label className="text-xs font-bold text-slate-700 block mb-1">ชื่อสถานที่เรียกง่าย</label>
                     <input
@@ -1086,31 +1098,37 @@ export default function ProfilePage() {
                       className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-[#1d61f2] resize-none"
                     ></textarea>
                   </div>
+                </div>
+              </div>
 
-                  <div className="flex gap-2 pt-2">
-                    <button type="button" onClick={() => setShowAddressModal(false)} className="py-2.5 px-4 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs cursor-pointer">
-                      ยกเลิก
-                    </button>
-                    <button 
-                      type="submit" 
-                      disabled={!isWithinRange}
-                      className={`flex-1 py-2.5 rounded-xl font-bold text-xs transition cursor-pointer shadow-md ${
-                        isWithinRange 
-                          ? 'bg-[#1d61f2] hover:bg-blue-700 text-white shadow-blue-500/20' 
-                          : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
-                      }`}
-                    >
-                      {isWithinRange ? 'ยืนยันปักหมุดตำแหน่งนี้' : 'อยู่นอกเขตให้บริการ 3 กม.'}
-                    </button>
-                  </div>
-                </form>
+              {/* Fixed Bottom Action Buttons (ตรึงไว้ล่างสุดเสมอ ไม่โดนดันหลุดจอ) */}
+              <div className="p-4 bg-white border-t border-slate-100 flex gap-2 shrink-0 z-30 shadow-lg">
+                <button 
+                  type="button" 
+                  onClick={() => setShowAddressModal(false)} 
+                  className="py-3 px-4 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs cursor-pointer hover:bg-slate-50 active:scale-95 transition"
+                >
+                  ยกเลิก
+                </button>
+                <button 
+                  type="button" 
+                  onClick={handleSaveAddress}
+                  disabled={!isWithinRange}
+                  className={`flex-1 py-3 rounded-xl font-bold text-xs transition cursor-pointer shadow-md active:scale-98 ${
+                    isWithinRange 
+                      ? 'bg-[#1d61f2] hover:bg-blue-700 text-white shadow-blue-500/20' 
+                      : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                  }`}
+                >
+                  {isWithinRange ? 'ยืนยันปักหมุดตำแหน่งนี้' : 'อยู่นอกเขตให้บริการ 3 กม.'}
+                </button>
               </div>
 
             </div>
           </div>
         )}
 
-        {/* Modal แก้ไขข้อมูลส่วนตัว + OTP ส่ง SMS จริง */}
+        {/* Modal แก้ไขข้อมูลส่วนตัว + OTP */}
         {showEditProfileModal && (
           <div className="absolute inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-6 backdrop-blur-xs">
             <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl flex flex-col gap-4 border border-slate-100">
