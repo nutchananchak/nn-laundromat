@@ -1,5 +1,24 @@
 import pool from '../config/db.js';
 
+const getNextRunningOrderId = async (connection) => {
+  const [rows] = await connection.query(`
+    SELECT CAST(SUBSTRING(order_id, 4) AS UNSIGNED) AS max_num 
+    FROM \`Order\` 
+    WHERE order_id REGEXP '^NN-[0-9]+$' 
+    ORDER BY max_num DESC 
+    LIMIT 1 
+    FOR UPDATE
+  `);
+
+  let nextNum = 1;
+  if (rows.length > 0 && rows[0].max_num !== null) {
+    nextNum = Number(rows[0].max_num) + 1;
+  }
+
+  // เติมเลขศูนย์ข้างหน้าให้ครบ 6 หลัก เช่น NN-000001
+  return `NN-${String(nextNum).padStart(6, '0')}`;
+};
+
 // 1. ดึงรายการออเดอร์ทั้งหมด
 export const getOrders = async (req, res) => {
   try {
@@ -95,7 +114,7 @@ export const getOrders = async (req, res) => {
         slipImage: row.slipImage,
         proofImage: proofImage,
         riderBasketImage: riderBasketImage,
-        basketImage: riderBasketImage, // เพิ่ม fallback ให้ Frontend
+        basketImage: riderBasketImage,
         paymentVerified: Boolean(row.paymentVerified),
         paymentRejected: Boolean(row.paymentRejected),
         rejectReason: row.rejectReason,
@@ -121,14 +140,16 @@ export const getOrders = async (req, res) => {
   }
 };
 
-// 2. สร้างคำสั่งซื้อใหม่ (Transaction)
+// 2. สร้างคำสั่งซื้อใหม่ (Running Number ภายใน Transaction)
 export const createOrder = async (req, res) => {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
 
     const data = req.body;
-    const orderId = String(data.id || `NN-${Math.floor(100000 + Math.random() * 900000)}`);
+    
+    // สร้างรหัสออเดอร์ Running Number แบบเรียงลำดับ NN-000001, NN-000002...
+    const orderId = await getNextRunningOrderId(connection);
     const cleanPhone = String(data.customerPhone || '0800000000').replace(/\D/g, '');
     const basketImg = data.riderBasketImage || data.basketImage || null;
 
@@ -157,7 +178,7 @@ export const createOrder = async (req, res) => {
     const serviceId = services.length > 0 ? services[0].service_id : 'wash_dry_fold';
     const actualServiceName = services.length > 0 ? services[0].name : (data.serviceName || 'ซัก อบ พับ');
 
-    // 3. บันทึกลงตาราง `Order` (เพิ่ม rider_basket_image เรียบร้อย)
+    // 3. บันทึกลงตาราง `Order`
     const insertOrderSql = `
       INSERT INTO \`Order\` (
         order_id, customer_id, customer_name, customer_phone,
@@ -231,7 +252,16 @@ export const createOrder = async (req, res) => {
     }
 
     await connection.commit();
-    res.status(201).json({ success: true, order: { ...data, id: orderId, riderBasketImage: basketImg, basketImage: basketImg } });
+    res.status(201).json({ 
+      success: true, 
+      order: { 
+        ...data, 
+        id: orderId, 
+        orderId: orderId,
+        riderBasketImage: basketImg, 
+        basketImage: basketImg 
+      } 
+    });
   } catch (error) {
     await connection.rollback();
     console.error('Error creating order:', error);
