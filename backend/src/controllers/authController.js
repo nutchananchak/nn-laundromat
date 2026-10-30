@@ -66,7 +66,11 @@ export const login = async (req, res) => {
       const cleanPhone = normalizePhone(rawIdentifier);
 
       const [riders] = await pool.query(
-        'SELECT rider_id AS id, name, phone_number, password FROM Rider WHERE rider_id = ? OR phone_number = ? OR REPLACE(REPLACE(phone_number, "-", ""), " ", "") = ?',
+        `SELECT rider_id AS id, name, phone_number, password 
+         FROM Rider 
+         WHERE rider_id = ? 
+            OR phone_number = ? 
+            OR REPLACE(REPLACE(phone_number, '-', ''), ' ', '') = ?`,
         [rawIdentifier, rawIdentifier, cleanPhone]
       );
 
@@ -95,7 +99,7 @@ export const login = async (req, res) => {
        FROM Customer 
        WHERE phone_number = ? 
           OR phone_number = ? 
-          OR REPLACE(REPLACE(phone_number, "-", ""), " ", "") = ?`,
+          OR REPLACE(REPLACE(phone_number, '-', ''), ' ', '') = ?`,
       [rawIdentifier, cleanPhone, cleanPhone]
     );
 
@@ -147,7 +151,7 @@ export const register = async (req, res) => {
     const [existing] = await pool.query(
       `SELECT customer_id FROM Customer 
        WHERE phone_number = ? 
-          OR REPLACE(REPLACE(phone_number, "-", ""), " ", "") = ?`,
+          OR REPLACE(REPLACE(phone_number, '-', ''), ' ', '') = ?`,
       [cleanPhone, cleanPhone]
     );
 
@@ -195,7 +199,7 @@ export const forgotPassword = async (req, res) => {
       `UPDATE ${table} 
        SET password = ? 
        WHERE phone_number = ? 
-          OR REPLACE(REPLACE(phone_number, "-", ""), " ", "") = ?`,
+          OR REPLACE(REPLACE(phone_number, '-', ''), ' ', '') = ?`,
       [cleanNewPassword, cleanPhone, cleanPhone]
     );
 
@@ -220,7 +224,7 @@ export const getProfile = async (req, res) => {
       `SELECT customer_id AS id, name, phone_number AS phone, address 
        FROM Customer 
        WHERE phone_number = ? 
-          OR REPLACE(REPLACE(phone_number, "-", ""), " ", "") = ?`,
+          OR REPLACE(REPLACE(phone_number, '-', ''), ' ', '') = ?`,
       [cleanPhone, cleanPhone]
     );
 
@@ -251,7 +255,7 @@ export const updateProfile = async (req, res) => {
        FROM Customer 
        WHERE customer_id = ? 
           OR phone_number = ? 
-          OR REPLACE(REPLACE(phone_number, "-", ""), " ", "") = ?`,
+          OR REPLACE(REPLACE(phone_number, '-', ''), ' ', '') = ?`,
       [customer_id || 0, cleanCurrentPhone, cleanCurrentPhone]
     );
 
@@ -266,7 +270,7 @@ export const updateProfile = async (req, res) => {
     if (cleanNewPhone && cleanNewPhone !== normalizePhone(targetCustomer.phone_number)) {
       const [duplicateCheck] = await pool.query(
         `SELECT customer_id FROM Customer 
-         WHERE (phone_number = ? OR REPLACE(REPLACE(phone_number, "-", ""), " ", "") = ?)
+         WHERE (phone_number = ? OR REPLACE(REPLACE(phone_number, '-', ''), ' ', '') = ?)
            AND customer_id != ?`,
         [cleanNewPhone, cleanNewPhone, targetCustomerId]
       );
@@ -320,9 +324,8 @@ export const requestOtp = async (req, res) => {
       return res.status(400).json({ message: 'กรุณาระบุเบอร์โทรศัพท์ที่ถูกต้อง' });
     }
 
-    // สุ่ม OTP 6 หลัก
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = Date.now() + 5 * 60 * 1000; // มีอายุ 5 นาที
+    const expiresAt = Date.now() + 5 * 60 * 1000;
 
     otpMemoryStore.set(cleanPhone, { otp, expiresAt });
 
@@ -400,7 +403,6 @@ export const verifyOtp = async (req, res) => {
       return res.status(400).json({ message: 'รหัส OTP ไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง' });
     }
 
-    // ยืนยันผ่านแล้ว ลบออกจาก Memory ป้องกันการใช้ซ้ำ
     otpMemoryStore.delete(cleanPhone);
 
     return res.status(200).json({
