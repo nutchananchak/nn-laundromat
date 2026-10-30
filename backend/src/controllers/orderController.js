@@ -151,7 +151,6 @@ export const createOrder = async (req, res) => {
     // สร้างรหัสออเดอร์ Running Number แบบเรียงลำดับ NN-000001, NN-000002...
     const orderId = await getNextRunningOrderId(connection);
     const cleanPhone = String(data.customerPhone || '0800000000').replace(/\D/g, '');
-    const basketImg = data.riderBasketImage || data.basketImage || null;
 
     // 1. ตรวจสอบหรือสร้าง Customer
     const [existingCustomers] = await connection.query(
@@ -179,6 +178,7 @@ export const createOrder = async (req, res) => {
     const actualServiceName = services.length > 0 ? services[0].name : (data.serviceName || 'ซัก อบ พับ');
 
     // 3. บันทึกลงตาราง `Order`
+    // สำคัญ: rider_basket_image ตอนนี้ต้องเป็น null เสมอ เพราะเพิ่งสั่ง ไรเดอร์ยังไม่ได้รับผ้า
     const insertOrderSql = `
       INSERT INTO \`Order\` (
         order_id, customer_id, customer_name, customer_phone,
@@ -208,7 +208,7 @@ export const createOrder = async (req, res) => {
       Number(data.totalPrice || 0),
       Number(data.plasticBagCount || 0),
       data.note || '',
-      basketImg,
+      null, // rider_basket_image ต้องเป็น null เสมอในขั้นตอนนี้
       data.status || 'pending',
       Number(data.statusStep || 1),
       data.statusTitle || 'รอตรวจสอบสลิป',
@@ -217,6 +217,14 @@ export const createOrder = async (req, res) => {
       false,
       data.createdAt || new Date().toLocaleString('th-TH')
     ]);
+
+    // หากลูกค้ามีรูปจุดวางผ้า ให้บันทึกเป็น customer_place ใน Evidence_Photo แยกไว้ต่างหาก
+    if (data.riderBasketImage || data.basketImage) {
+      await connection.query(
+        'INSERT INTO Evidence_Photo (order_id, photo_type, photo_url) VALUES (?, ?, ?)',
+        [orderId, 'customer_place', data.riderBasketImage || data.basketImage]
+      );
+    }
 
     // 4. บันทึกหลักฐานสลิปลงตาราง Payment
     if (data.slipImage) {
@@ -258,8 +266,8 @@ export const createOrder = async (req, res) => {
         ...data, 
         id: orderId, 
         orderId: orderId,
-        riderBasketImage: basketImg, 
-        basketImage: basketImg 
+        riderBasketImage: null, 
+        basketImage: null 
       } 
     });
   } catch (error) {
