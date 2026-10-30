@@ -2,7 +2,7 @@ import axios from 'axios';
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL && !import.meta.env.VITE_API_URL.includes('localhost'))
   ? import.meta.env.VITE_API_URL 
-  : 'https://nn-laundromat.onrender.com/api';
+  : 'https://nn-laundromat-api.onrender.com/api';
 
 const safeCacheOrders = (ordersList) => {
   if (!ordersList || !Array.isArray(ordersList)) return;
