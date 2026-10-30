@@ -7,5 +7,6 @@ router.get('/', getOrders);
 router.post('/', createOrder);
 router.put('/:id', updateOrderStatus);
 router.patch('/:id/status', updateOrderStatus);
+router.patch('/:id', updateOrderStatus);
 
 export default router;
