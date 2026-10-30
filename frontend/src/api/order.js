@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://nn-laundromat.onrender.com/api';
+const API_BASE_URL = (import.meta.env.VITE_API_URL && !import.meta.env.VITE_API_URL.includes('localhost'))
+  ? import.meta.env.VITE_API_URL 
+  : 'https://nn-laundromat.onrender.com/api';
 
 const safeCacheOrders = (ordersList) => {
   if (!ordersList || !Array.isArray(ordersList)) return;
@@ -18,7 +20,6 @@ const safeCacheOrders = (ordersList) => {
     }));
     localStorage.setItem('orders', JSON.stringify(lightweight));
   } catch (err) {
-    // หากเต็ม ล้างคีย์ orders ทิ้งทันที ไม่ให้ขัดขวางการทำงานของระบบ
     try {
       localStorage.removeItem('orders');
     } catch (e) {}
@@ -31,10 +32,7 @@ export const fetchOrders = async (userId = null) => {
     const url = userId ? `${API_BASE_URL}/orders?userId=${userId}` : `${API_BASE_URL}/orders`;
     const response = await axios.get(url);
     const data = response.data || [];
-
-    // เซฟแคชแบบปลอดภัย (ไม่ยัด Base64)
     safeCacheOrders(data);
-
     return data;
   } catch (error) {
     console.warn('API fetchOrders failed, falling back to local cache:', error.message);
@@ -53,7 +51,7 @@ export const fetchOrderById = async (orderId) => {
     const response = await axios.get(`${API_BASE_URL}/orders/${orderId}`);
     return response.data;
   } catch (error) {
-    console.warn(`API fetchOrderById for ${orderId} failed, falling back to cache:`, error.message);
+    console.warn(`API fetchOrderById for ${orderId} failed:`, error.message);
     try {
       const cached = localStorage.getItem('orders');
       if (cached) {
