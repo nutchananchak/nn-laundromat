@@ -367,28 +367,32 @@ export default function HomePage() {
   };
 
   return (
-    <div style={{
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      minHeight: '100vh',
-      minHeight: '100dvh',
-      backgroundColor: '#0f172a',
-      margin: 0,
-      padding: 0,
-    }}>
-      <div style={{
-        width: '100vw',
-        maxWidth: '430px',
-        height: '100vh',
-        maxHeight: '100vh',
-        backgroundColor: '#f8fafc',
+    <div 
+      style={{
         display: 'flex',
-        flexDirection: 'column',
-        position: 'relative',
-        overflowX: 'hidden',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-      }} className="font-body text-base">
+        justifyContent: 'center',
+        alignItems: 'flex-start',
+        minHeight: '100vh',
+        minHeight: '100dvh',
+        backgroundColor: '#0f172a',
+        margin: 0,
+        padding: 0,
+      }}
+    >
+      <div 
+        style={{
+          width: '100vw',
+          maxWidth: '430px',
+          minHeight: '100vh',
+          minHeight: '100dvh',
+          backgroundColor: '#f8fafc',
+          display: 'flex',
+          flexDirection: 'column',
+          position: 'relative',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+        }} 
+        className="font-body text-base"
+      >
 
         {/* 1. Top Bar */}
         <div 
@@ -396,7 +400,7 @@ export default function HomePage() {
             background: 'linear-gradient(135deg, #1d61f2 0%, #1045b8 100%)',
             boxShadow: '0 10px 25px rgba(29, 97, 242, 0.25)',
           }}
-          className="rounded-b-3xl px-5 pt-6 pb-5 flex items-center justify-between shrink-0 z-20 text-white"
+          className="sticky top-0 rounded-b-3xl px-5 pt-6 pb-5 flex items-center justify-between shrink-0 z-30 text-white"
         >
           <div 
             onClick={() => {
@@ -417,7 +421,7 @@ export default function HomePage() {
               </span>
               <div className="flex items-center gap-1 mt-1">
                 <span className="text-sm font-bold truncate text-white">
-                  {currentAddress ? `${currentAddress.title} - ${currentAddress.detail}` : 'ยังไม่ระบุที่อยู่ (แตะเพื่อปักหมุด)'}
+                  {currentAddress ? `${currentAddress.title} ${currentAddress.detail}` : 'ยังไม่ระบุที่อยู่ (แตะเพื่อปักหมุด)'}
                 </span>
                 <ChevronDown size={16} className="text-blue-200 group-hover:text-white transition shrink-0" />
               </div>
@@ -445,7 +449,10 @@ export default function HomePage() {
         </div>
 
         {/* 2. Scrollable Content */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 pb-40 flex flex-col gap-4">
+        <div 
+          className="flex-1 px-5 py-4 pb-32 flex flex-col gap-4 overflow-y-auto"
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
 
           {/* ป้ายแจ้งเตือนสลิปไม่ผ่าน */}
           {isSlipRejected && (
@@ -647,13 +654,12 @@ export default function HomePage() {
               </div>
             </div>
           ) : (
-            /* Smart Banner (รวมสไลด์สะสมแต้มเสื้อ/ดาว ดีไซน์ใหม่โปร่งสบายตา) */
+            /* Smart Banner */
             <div className="bg-white p-4.5 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between min-h-[195px] transition-all">
               
-              {/* สไลด์ 0: การ์ดสะสมแต้มรูปเสื้อ & ดาว (แสดงหน้าแรกเมื่อเคยซักแล้ว) */}
+              {/* สไลด์ 0: การ์ดสะสมแต้ม */}
               {hasHistory && bannerIndex === 0 && (
                 <div className="w-full flex flex-col justify-between h-full animate-in fade-in duration-300">
-                  {/* หัวข้อสไลด์ */}
                   <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                     <div className="flex items-center gap-2">
                       <div className="w-7 h-7 rounded-xl bg-blue-50 text-[#1d61f2] flex items-center justify-center shrink-0">
@@ -669,7 +675,6 @@ export default function HomePage() {
                     </span>
                   </div>
 
-                  {/* แถบหลอดสะสมดาวและรูปเสื้อ (ดีไซน์กว้าง โปร่งตา ไม่โดนบีบ) */}
                   <div className="py-2.5 px-1">
                     <div className="grid grid-cols-10 gap-1.5">
                       {Array.from({ length: 10 }).map((_, index) => {
@@ -707,7 +712,6 @@ export default function HomePage() {
                     </div>
                   </div>
 
-                  {/* คำอธิบายสิทธิ์ด้านล่าง */}
                   <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1.5 border-t border-slate-100">
                     <span className="truncate pr-1">
                       {hasFreeReward 
@@ -916,7 +920,7 @@ export default function HomePage() {
 
         {/* Modal ยืนยันการยกเลิกออเดอร์ */}
         {showCancelModal && (
-          <div className="absolute inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
             <div className="bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl flex flex-col gap-4 animate-in zoom-in-95 duration-150 border border-slate-100">
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <div>
@@ -987,7 +991,7 @@ export default function HomePage() {
 
         {/* Modal เลือกที่อยู่ */}
         {showAddressPicker && (
-          <div className="absolute inset-0 bg-slate-900/50 z-50 flex items-end justify-center backdrop-blur-xs">
+          <div className="fixed inset-0 bg-slate-900/50 z-50 flex items-end justify-center backdrop-blur-xs">
             <div className="bg-white w-full max-w-[430px] rounded-t-3xl p-5 shadow-2xl flex flex-col gap-4 animate-in slide-in-from-bottom duration-200">
               <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                 <div className="flex items-center gap-2">
