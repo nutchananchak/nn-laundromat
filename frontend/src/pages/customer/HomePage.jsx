@@ -371,36 +371,38 @@ export default function HomePage() {
       style={{
         display: 'flex',
         justifyContent: 'center',
-        alignItems: 'flex-start',
-        minHeight: '100vh',
-        minHeight: '100dvh',
+        alignItems: 'center',
+        height: '100vh',
+        height: '100dvh',
         backgroundColor: '#0f172a',
         margin: 0,
         padding: 0,
+        overflow: 'hidden'
       }}
     >
       <div 
         style={{
           width: '100vw',
           maxWidth: '430px',
-          minHeight: '100vh',
-          minHeight: '100dvh',
+          height: '100vh',
+          height: '100dvh',
           backgroundColor: '#f8fafc',
           display: 'flex',
           flexDirection: 'column',
           position: 'relative',
+          overflow: 'hidden',
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
         }} 
         className="font-body text-base"
       >
 
-        {/* 1. Top Bar */}
+        {/* 1. Top Bar (อยู่กับที่ด้านบนเสมอ shrink-0) */}
         <div 
           style={{
             background: 'linear-gradient(135deg, #1d61f2 0%, #1045b8 100%)',
             boxShadow: '0 10px 25px rgba(29, 97, 242, 0.25)',
           }}
-          className="sticky top-0 rounded-b-3xl px-5 pt-6 pb-5 flex items-center justify-between shrink-0 z-30 text-white"
+          className="rounded-b-3xl px-5 pt-6 pb-5 flex items-center justify-between shrink-0 z-20 text-white"
         >
           <div 
             onClick={() => {
@@ -448,10 +450,13 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* 2. Scrollable Content */}
+        {/* 2. Scrollable Content (ส่วนเนื้อหาที่เลื่อนได้อย่างอิสระ flex-1 min-h-0 overflow-y-auto) */}
         <div 
-          className="flex-1 px-5 py-4 pb-32 flex flex-col gap-4 overflow-y-auto"
-          style={{ WebkitOverflowScrolling: 'touch' }}
+          className="flex-1 min-h-0 overflow-y-auto px-5 py-4 pb-28 flex flex-col gap-4"
+          style={{ 
+            WebkitOverflowScrolling: 'touch',
+            overscrollBehaviorY: 'contain'
+          }}
         >
 
           {/* ป้ายแจ้งเตือนสลิปไม่ผ่าน */}
@@ -1051,7 +1056,10 @@ export default function HomePage() {
           </div>
         )}
 
-        <BottomNav />
+        {/* 3. BottomNav (วางอยู่นิ่งๆ ด้านล่างสุดเสมอ shrink-0) */}
+        <div className="shrink-0 z-30">
+          <BottomNav />
+        </div>
       </div>
     </div>
   );
