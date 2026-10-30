@@ -200,7 +200,6 @@ export default function OrderDetailPage() {
     navigate('/home');
   };
 
-  // กรณีอยู่ระหว่างโหลดข้อมูล
   if (isLoading && !order) {
     return (
       <div style={{
@@ -218,7 +217,6 @@ export default function OrderDetailPage() {
     );
   }
 
-  // กรณีไม่พบคำสั่งซื้อจริงใน Database
   if (!order) {
     return (
       <div style={{
@@ -309,13 +307,13 @@ export default function OrderDetailPage() {
               </div>
             </div>
 
-            {/* ภาพถ่ายยืนยันจากไรเดอร์ตอนรับผ้า */}
-            {(order.riderPickupImage || order.riderBasketImage) ? (
+            {/* ภาพถ่ายยืนยันจากไรเดอร์ตอนรับผ้า (จะแสดงเมื่อ Step >= 4 และมีรูปถ่ายจริงจากไรเดอร์เท่านั้น) */}
+            {currentStep >= 4 && (order.riderPickupImage || order.riderBasketImage) ? (
               <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-xs flex flex-col gap-2.5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
                     <Camera size={16} className="text-[#1d61f2]" />
-                    <span>รูปถ่ายจุดรับผ้า / ตะกร้าผ้า</span>
+                    <span>รูปถ่ายยืนยันการรับผ้าจากไรเดอร์</span>
                   </div>
                   <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
                     ไรเดอร์ถ่ายยืนยันแล้ว
@@ -334,9 +332,9 @@ export default function OrderDetailPage() {
               </div>
             ) : (
               currentStep < 4 && (
-                <div className="p-3 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-center">
+                <div className="p-3.5 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-center">
                   <span className="text-[11.5px] text-slate-400 font-medium block">
-                    เมื่อไรเดอร์ถึงจุดรับผ้า จะถ่ายภาพตะกร้าผ้าเพื่อยืนยันให้ท่านตรวจสอบที่นี่
+                    เมื่อไรเดอร์เดินทางถึงจุดรับผ้าและรับผ้าแล้ว จะมีภาพถ่ายยืนยันปรากฏขึ้นที่นี่
                   </span>
                 </div>
               )
@@ -345,7 +343,7 @@ export default function OrderDetailPage() {
             {/* ผู้ดูแลการจัดส่ง */}
             <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-xs flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-blue-50 text-[#1d61f2] flex items-center justify-center shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#1d61f2] flex items-center justify-center shrink-0">
                   <Bike size={20} />
                 </div>
                 <div>
@@ -426,7 +424,7 @@ export default function OrderDetailPage() {
               <AlertCircle size={14} className="text-red-500" /> แจ้งปัญหาเกี่ยวกับออเดอร์นี้
             </button>
 
-            {/* ปุ่มปิด (กลับสู่หน้าหลัก) */}
+            {/* ปุ่มปิด */}
             <button
               type="button"
               onClick={() => navigate('/home')}
@@ -506,7 +504,7 @@ export default function OrderDetailPage() {
                       <span className="text-[11px] font-bold text-slate-700">รายการพิเศษ (แยกชิ้น):</span>
                       {order.specialItems.map((item, idx) => (
                         <div key={item.id || idx} className="flex justify-between text-xs text-slate-600">
-                          <span>• {item.name} x {item.count} {item.unit || 'ชิ้น'}</span>
+                          <span>{item.name} x {item.count} {item.unit || 'ชิ้น'}</span>
                           <span className="font-semibold text-slate-900">
                             {Number(item.total || (Number(item.price || 0) * Number(item.count || 0))).toLocaleString()} ฿
                           </span>
@@ -517,7 +515,7 @@ export default function OrderDetailPage() {
 
                   {order.plasticBagCount > 0 && (
                     <div className="flex justify-between items-center text-xs text-slate-600 pt-2 border-t border-slate-200/60">
-                      <span>• ถุงพลาสติกใส่ผ้า x {order.plasticBagCount} ใบ</span>
+                      <span>ถุงพลาสติกใส่ผ้า x {order.plasticBagCount} ใบ</span>
                       <span className="font-semibold text-slate-900">
                         {Number(order.plasticBagPrice || order.plasticBagCount * 5).toLocaleString()} ฿
                       </span>
@@ -602,7 +600,7 @@ export default function OrderDetailPage() {
               <AlertCircle size={14} className="text-red-500" /> แจ้งปัญหาเกี่ยวกับออเดอร์นี้
             </button>
 
-            {/* ปุ่มปิด (ส่วนใบเสร็จ) */}
+            {/* ปุ่มปิด */}
             <button
               type="button"
               onClick={handleFinish}
