@@ -15,7 +15,6 @@ const getNextRunningOrderId = async (connection) => {
     nextNum = Number(rows[0].max_num) + 1;
   }
 
-  // เติมเลขศูนย์ข้างหน้าให้ครบ 6 หลัก เช่น NN-000001
   return `NN-${String(nextNum).padStart(6, '0')}`;
 };
 
@@ -73,21 +72,35 @@ export const getOrders = async (req, res) => {
     const [rows] = await pool.query(sql, params);
 
     const formattedOrders = await Promise.all(rows.map(async (row) => {
-      // ดึงรูปถ่ายหลักฐานเพิ่มเติมจาก Evidence_Photo
+      // ดึงรูปถ่ายหลักฐานทั้งหมดจาก Evidence_Photo
       const [photos] = await pool.query(
-        'SELECT photo_type, photo_url FROM Evidence_Photo WHERE order_id = ?',
+        'SELECT photo_type, photo_url FROM Evidence_Photo WHERE order_id = ? ORDER BY photo_id ASC',
         [row.id]
       );
 
       let proofImage = row.proofImageFromOrder || null;
-      let riderBasketImage = row.basketImageFromOrder || null;
+      let riderPickupImage = row.basketImageFromOrder || null;
+      let customerBasketImage = null;
 
       photos.forEach(p => {
-        if (p.photo_type === 'delivery' || p.photo_type === 'delivery_proof') proofImage = p.photo_url;
-        if (p.photo_type === 'pickup' || p.photo_type === 'rider_basket' || p.photo_type === 'customer_place') {
-          riderBasketImage = p.photo_url;
+        // รูปยืนยันส่งงาน
+        if (p.photo_type === 'delivery' || p.photo_type === 'delivery_proof') {
+          proofImage = p.photo_url;
+        }
+        // รูปถ่ายจุดวางผ้าของลูกค้าตอนสั่งซื้อ
+        if (p.photo_type === 'customer_basket' || p.photo_type === 'customer_place' || p.photo_type === 'basket') {
+          customerBasketImage = p.photo_url;
+        }
+        // รูปที่ไรเดอร์ถ่ายตอนรับผ้า
+        if (p.photo_type === 'rider_pickup' || p.photo_type === 'rider_basket' || p.photo_type === 'pickup') {
+          riderPickupImage = p.photo_url;
         }
       });
+
+      // หากยังไม่มีรูปแยก ให้จัดสรรเพื่อป้องกันการทับกัน
+      if (!customerBasketImage && row.basketImageFromOrder && Number(row.statusStep) <= 3) {
+        customerBasketImage = row.basketImageFromOrder;
+      }
 
       // ดึงรายการพิเศษ
       const [specialItems] = await pool.query(
@@ -115,8 +128,10 @@ export const getOrders = async (req, res) => {
         plasticBagCount: Number(row.plasticBagCount || 0),
         slipImage: row.slipImage,
         proofImage: proofImage,
-        riderBasketImage: riderBasketImage,
-        basketImage: riderBasketImage,
+        riderPickupImage: riderPickupImage,
+        riderBasketImage: riderPickupImage,
+        customerBasketImage: customerBasketImage,
+        basketImage: customerBasketImage || riderPickupImage,
         paymentVerified: Boolean(row.paymentVerified),
         paymentRejected: Boolean(row.paymentRejected),
         rejectReason: row.rejectReason,
@@ -142,15 +157,13 @@ export const getOrders = async (req, res) => {
   }
 };
 
-// 2. สร้างคำสั่งซื้อใหม่ (Running Number ภายใน Transaction)
+// 2. สร้างคำสั่งซื้อใหม่
 export const createOrder = async (req, res) => {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
 
     const data = req.body;
-    
-    // สร้างรหัสออเดอร์ Running Number แบบเรียงลำดับ NN-000001, NN-000002...
     const orderId = await getNextRunningOrderId(connection);
     const cleanPhone = String(data.customerPhone || '0800000000').replace(/\D/g, '');
 
@@ -179,7 +192,7 @@ export const createOrder = async (req, res) => {
     const serviceId = services.length > 0 ? services[0].service_id : 'wash_dry_fold';
     const actualServiceName = services.length > 0 ? services[0].name : (data.serviceName || 'ซัก อบ พับ');
 
-    // 3. บันทึกลงตาราง `Order`
+    // 3. บันทึกลงตาราง Order
     const insertOrderSql = `
       INSERT INTO \`Order\` (
         order_id, customer_id, customer_name, customer_phone,
@@ -192,6 +205,9 @@ export const createOrder = async (req, res) => {
         created_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
+
+    // รูปจุดวางผ้าของลูกค้าตอนสั่งซื้อ
+    const customerBasketPhoto = data.customerBasketImage || data.basketImage || data.riderBasketImage || null;
 
     await connection.query(insertOrderSql, [
       orderId,
@@ -209,7 +225,7 @@ export const createOrder = async (req, res) => {
       Number(data.totalPrice || 0),
       Number(data.plasticBagCount || 0),
       data.note || '',
-      null, // rider_basket_image เป็น null รอไรเดอร์มารับผ้า
+      null, // rider_basket_image ยังเป็น null รอไรเดอร์ถ่าย
       data.status || 'pending',
       Number(data.statusStep || 1),
       data.statusTitle || 'รอตรวจสอบสลิป',
@@ -219,12 +235,18 @@ export const createOrder = async (req, res) => {
       data.createdAt || new Date().toLocaleString('th-TH')
     ]);
 
-    // บันทึกรูปถ่ายจุดวางผ้า: ใช้ค่า 'pickup' เพื่อให้ตรงตาม ENUM และความยาวคอลัมน์ของฐานข้อมูล
-    if (data.riderBasketImage || data.basketImage) {
+    // บันทึกรูปถ่ายจุดวางผ้าของลูกค้าลง Evidence_Photo เป็น 'customer_basket' (หรือ 'pickup' ถ้า schema บังคับ)
+    if (customerBasketPhoto) {
       await connection.query(
         'INSERT INTO Evidence_Photo (order_id, photo_type, photo_url) VALUES (?, ?, ?)',
-        [orderId, 'pickup', data.riderBasketImage || data.basketImage]
-      );
+        [orderId, 'customer_basket', customerBasketPhoto]
+      ).catch(async () => {
+        // Fallback หาก Database ยังเป็น ENUM ตัวเก่า
+        await connection.query(
+          'INSERT INTO Evidence_Photo (order_id, photo_type, photo_url) VALUES (?, ?, ?)',
+          [orderId, 'pickup', customerBasketPhoto]
+        );
+      });
     }
 
     // 4. บันทึกหลักฐานสลิปลงตาราง Payment
@@ -267,6 +289,7 @@ export const createOrder = async (req, res) => {
         ...data, 
         id: orderId, 
         orderId: orderId,
+        customerBasketImage: customerBasketPhoto,
         riderBasketImage: null, 
         basketImage: null 
       } 
@@ -323,14 +346,33 @@ export const updateOrderStatus = async (req, res) => {
       );
     }
 
-    // อัปเดตรูปถ่ายจุดวางผ้า / รูปส่งงานลงตาราง Order โดยตรง
-    if (body.riderBasketImage || body.basketImage) {
+    // รูปถ่ายจุดรับผ้าที่ไรเดอร์ถ่าย (บันทึกลง rider_basket_image ใน Order)
+    const riderCapturedPickup = body.riderPickupImage || (Number(body.statusStep) >= 4 ? body.riderBasketImage : null);
+    if (riderCapturedPickup) {
       orderFields.push('rider_basket_image = ?');
-      orderValues.push(body.riderBasketImage || body.basketImage);
+      orderValues.push(riderCapturedPickup);
+
+      await connection.query(
+        'INSERT INTO Evidence_Photo (order_id, photo_type, photo_url) VALUES (?, ?, ?)',
+        [id, 'rider_pickup', riderCapturedPickup]
+      ).catch(async () => {
+        await connection.query(
+          'INSERT INTO Evidence_Photo (order_id, photo_type, photo_url) VALUES (?, ?, ?)',
+          [id, 'pickup', riderCapturedPickup]
+        );
+      });
     }
-    if (body.proofImage) {
+
+    // รูปส่งมอบผ้าคืนสำเร็จ
+    if (body.proofImage || body.riderDeliveryImage) {
+      const deliveryImg = body.proofImage || body.riderDeliveryImage;
       orderFields.push('proof_image = ?');
-      orderValues.push(body.proofImage);
+      orderValues.push(deliveryImg);
+
+      await connection.query(
+        'INSERT INTO Evidence_Photo (order_id, photo_type, photo_url) VALUES (?, ?, ?)',
+        [id, 'delivery', deliveryImg]
+      );
     }
 
     // อัปเดตสถานะทั่วไป
@@ -352,19 +394,6 @@ export const updateOrderStatus = async (req, res) => {
       await connection.query(
         `UPDATE \`Order\` SET ${orderFields.join(', ')} WHERE order_id = ?`,
         orderValues
-      );
-    }
-    
-    if (body.proofImage) {
-      await connection.query(
-        'INSERT INTO Evidence_Photo (order_id, photo_type, photo_url) VALUES (?, ?, ?)',
-        [id, 'delivery', body.proofImage]
-      );
-    }
-    if (body.riderBasketImage || body.basketImage) {
-      await connection.query(
-        'INSERT INTO Evidence_Photo (order_id, photo_type, photo_url) VALUES (?, ?, ?)',
-        [id, 'pickup', body.riderBasketImage || body.basketImage]
       );
     }
 

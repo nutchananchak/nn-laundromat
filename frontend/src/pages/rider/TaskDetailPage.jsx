@@ -7,7 +7,7 @@ import {
   Navigation, 
   Camera, 
   Trash2, 
-  Image as ImageIcon,
+  Image as ImageIcon, 
   CheckCircle2, 
   AlertTriangle, 
   ExternalLink, 
@@ -121,13 +121,8 @@ export default function TaskDetailPage() {
     );
   }
 
-  const customerBasketImage = (() => {
-    const potentialImg = order.customerBasketImage || order.basketImage || order.customerBasketPhoto || order.basketPhoto;
-    if (potentialImg && potentialImg !== order.riderPickupImage && potentialImg !== order.proofImage) {
-      return potentialImg;
-    }
-    return null;
-  })();
+  // รูปจุดวางผ้าที่ลูกค้าถ่ายไว้ตอนสั่งซื้อ
+  const customerBasketImage = order.customerBasketImage || order.customerBasketPhoto || (Number(order.statusStep) <= 3 ? (order.riderBasketImage || order.basketImage) : null);
 
   const targetCoords = (order.lat && order.lng) 
     ? { lat: Number(order.lat), lng: Number(order.lng) } 
@@ -153,7 +148,7 @@ export default function TaskDetailPage() {
     }
   };
 
-  // บีบอัดรูปถ่ายของไรเดอร์ผ่าน Canvas ไม่ให้ไฟล์ใหญ่เกิน 200 KB
+  // บีบอัดรูปถ่ายของไรเดอร์ผ่าน Canvas
   const handleImageCapture = (e) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -197,7 +192,7 @@ export default function TaskDetailPage() {
     triggerToast('ลบรูปถ่ายเรียบร้อยแล้ว', 'info');
   };
 
-  // เลื่อนสถานะงาน บันทึกลง MySQL ตรงๆ และตัด Base64 ออกจาก Storage
+  // เลื่อนสถานะงาน บันทึกลง MySQL ตรงๆ
   const handleAdvanceStep = async (nextStep, nextTitle) => {
     const now = new Date();
     const d = new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }).format(now);
@@ -219,7 +214,6 @@ export default function TaskDetailPage() {
 
       if (nextStep === 4 && proofImage) {
         updatePayload.riderPickupImage = proofImage;
-        updatePayload.riderBasketImage = proofImage;
       }
       if (nextStep >= 6 && proofImage) {
         updatePayload.proofImage = proofImage;
@@ -237,7 +231,6 @@ export default function TaskDetailPage() {
             status: isDone ? 'completed' : item.status,
             isCompleted: isDone,
             riderPickupImage: updatePayload.riderPickupImage || item.riderPickupImage,
-            riderBasketImage: updatePayload.riderBasketImage || item.riderBasketImage,
             proofImage: updatePayload.proofImage || item.proofImage,
             riderDeliveryImage: updatePayload.riderDeliveryImage || item.riderDeliveryImage,
             deliveredAt: isDone ? realNowTimestamp : item.deliveredAt,
@@ -249,22 +242,6 @@ export default function TaskDetailPage() {
 
       if (setOrders) {
         setOrders(updatedOrders);
-      }
-
-      // Safe Cache: เก็บเฉพาะรายการจำเป็น ตัดรูป Base64 ออกเสมอ
-      try {
-        const safeCache = updatedOrders.slice(0, 10).map(o => ({
-          ...o,
-          slipImage: null,
-          riderBasketImage: null,
-          riderPickupImage: null,
-          proofImage: null,
-          riderDeliveryImage: null,
-          basketImage: null
-        }));
-        localStorage.setItem('orders', JSON.stringify(safeCache));
-      } catch (storageErr) {
-        localStorage.removeItem('orders');
       }
 
       if (isDone) {
