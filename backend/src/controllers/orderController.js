@@ -23,8 +23,15 @@ export const getOrders = async (req, res) => {
   try {
     const { userId } = req.query;
 
-    let sql = `
-      SELECT 
+    const params = [];
+    let whereSql = '';
+    if (userId) {
+      whereSql = 'WHERE o.customer_phone = ?';
+      params.push(userId);
+    }
+
+    const [rows] = await pool.query(`
+      SELECT
         o.order_id AS id,
         o.customer_id AS customerId,
         o.customer_name AS customerName,
@@ -50,6 +57,7 @@ export const getOrders = async (req, res) => {
         o.reject_reason AS rejectReason,
         o.cancel_reason AS cancelReason,
         o.cancelled_at AS cancelledAt,
+        o.verified_at AS verifiedAt,
         o.delivered_at AS deliveredAt,
         o.created_at AS createdAt,
         p.slip_image AS slipImage,
@@ -58,55 +66,59 @@ export const getOrders = async (req, res) => {
         r.name AS riderName,
         r.phone_number AS riderPhone
       FROM \`Order\` o
-      LEFT JOIN Payment p ON o.order_id = p.order_id
-      LEFT JOIN Rider r ON (o.delivery_rider_id = r.rider_id OR o.pickup_rider_id = r.rider_id)
-    `;
+      LEFT JOIN Payment p ON p.order_id = o.order_id
+      LEFT JOIN Rider r ON r.rider_id = COALESCE(o.delivery_rider_id, o.pickup_rider_id)
+      ${whereSql}
+      ORDER BY o.created_at_ts DESC, o.order_id DESC
+    `, params);
 
-    const params = [];
-    if (userId) {
-      sql += ` WHERE o.customer_phone = ? `;
-      params.push(userId);
-    }
-    sql += ` ORDER BY o.created_at DESC `;
+    // ดึงรูปหลักฐานและรายการพิเศษของทุกออเดอร์ "ครั้งเดียว" แทนที่จะวนยิงทีละออเดอร์
+    const ids = rows.map(r => r.id);
+    const photosByOrder = {};
+    const itemsByOrder = {};
 
-    const [rows] = await pool.query(sql, params);
-
-    const formattedOrders = await Promise.all(rows.map(async (row) => {
-      // ดึงรูปถ่ายหลักฐานทั้งหมดจาก Evidence_Photo
+    if (ids.length > 0) {
       const [photos] = await pool.query(
-        'SELECT photo_type, photo_url FROM Evidence_Photo WHERE order_id = ? ORDER BY photo_id ASC',
-        [row.id]
+        'SELECT order_id, photo_type, photo_url FROM Evidence_Photo WHERE order_id IN (?) ORDER BY photo_id ASC',
+        [ids]
       );
+      photos.forEach(p => {
+        (photosByOrder[p.order_id] = photosByOrder[p.order_id] || []).push(p);
+      });
+
+      const [items] = await pool.query(
+        'SELECT item_id AS id, order_id, name, count, unit, price, total FROM Order_Special_Items WHERE order_id IN (?)',
+        [ids]
+      );
+      items.forEach(i => {
+        (itemsByOrder[i.order_id] = itemsByOrder[i.order_id] || []).push(i);
+      });
+    }
+
+    const formattedOrders = rows.map((row) => {
+      const photos = photosByOrder[row.id] || [];
 
       let proofImage = row.proofImageFromOrder || null;
       let riderPickupImage = row.basketImageFromOrder || null;
       let customerBasketImage = null;
 
       photos.forEach(p => {
-        // รูปยืนยันส่งงาน
         if (p.photo_type === 'delivery' || p.photo_type === 'delivery_proof') {
           proofImage = p.photo_url;
         }
-        // รูปถ่ายจุดวางผ้าของลูกค้าตอนสั่งซื้อ
         if (p.photo_type === 'customer_basket' || p.photo_type === 'customer_place' || p.photo_type === 'basket') {
           customerBasketImage = p.photo_url;
         }
-        // รูปที่ไรเดอร์ถ่ายตอนรับผ้า
         if (p.photo_type === 'rider_pickup' || p.photo_type === 'rider_basket' || p.photo_type === 'pickup') {
           riderPickupImage = p.photo_url;
         }
       });
 
-      // หากยังไม่มีรูปแยก ให้จัดสรรเพื่อป้องกันการทับกัน
       if (!customerBasketImage && row.basketImageFromOrder && Number(row.statusStep) <= 3) {
         customerBasketImage = row.basketImageFromOrder;
       }
 
-      // ดึงรายการพิเศษ
-      const [specialItems] = await pool.query(
-        'SELECT item_id AS id, name, count, unit, price, total FROM Order_Special_Items WHERE order_id = ?',
-        [row.id]
-      );
+      const specialItems = (itemsByOrder[row.id] || []).map(({ order_id, ...rest }) => rest);
 
       return {
         id: row.id,
@@ -117,7 +129,7 @@ export const getOrders = async (req, res) => {
         lng: row.lng ? Number(row.lng) : null,
         serviceName: row.serviceName,
         packageName: row.packageName,
-        specialItems: specialItems || [],
+        specialItems,
         status: row.status,
         statusStep: Number(row.statusStep),
         statusTitle: row.statusTitle,
@@ -127,16 +139,17 @@ export const getOrders = async (req, res) => {
         note: row.note || '',
         plasticBagCount: Number(row.plasticBagCount || 0),
         slipImage: row.slipImage,
-        proofImage: proofImage,
-        riderPickupImage: riderPickupImage,
+        proofImage,
+        riderPickupImage,
         riderBasketImage: riderPickupImage,
-        customerBasketImage: customerBasketImage,
+        customerBasketImage,
         basketImage: customerBasketImage || riderPickupImage,
         paymentVerified: Boolean(row.paymentVerified),
         paymentRejected: Boolean(row.paymentRejected),
         rejectReason: row.rejectReason,
         cancelReason: row.cancelReason,
         cancelledAt: row.cancelledAt,
+        verifiedAt: row.verifiedAt,
         deliveredAt: row.deliveredAt,
         createdAt: row.createdAt,
         rider: row.riderId ? {
@@ -145,14 +158,14 @@ export const getOrders = async (req, res) => {
           phone: row.riderPhone
         } : null
       };
-    }));
+    });
 
     res.status(200).json(formattedOrders);
   } catch (error) {
     console.error('🔥 Error SQL Detail:', error.message);
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'เกิดข้อผิดพลาดในการดึงข้อมูลออเดอร์',
-      detail: error.message 
+      detail: error.message
     });
   }
 };
@@ -379,7 +392,7 @@ export const updateOrderStatus = async (req, res) => {
     if (body.statusStep !== undefined) { orderFields.push('status_step = ?'); orderValues.push(Number(body.statusStep)); }
     if (body.statusTitle !== undefined) { orderFields.push('status_title = ?'); orderValues.push(body.statusTitle); }
     if (body.status !== undefined) { orderFields.push('status = ?'); orderValues.push(body.status); }
-    if (body.deliveredAt !== undefined) { orderFields.push('delivered_at = ?'); orderValues.push(body.deliveredAt); }
+    if (body.verifiedAt !== undefined) { orderFields.push('verified_at = ?'); orderValues.push(body.verifiedAt); }
     if (body.cancelReason !== undefined) { orderFields.push('cancel_reason = ?'); orderValues.push(body.cancelReason); }
     if (body.cancelledAt !== undefined) { orderFields.push('cancelled_at = ?'); orderValues.push(body.cancelledAt); }
 

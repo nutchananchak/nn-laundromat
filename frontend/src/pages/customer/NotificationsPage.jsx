@@ -17,6 +17,7 @@ import {
 import BottomNav from '../../components/layout/BottomNav';
 import { useApp } from '../../context/AppContext';
 import { fetchOrders } from '../../api/order';
+import { cacheOrders } from '../../utils/orderCache';
 
 export default function NotificationPage() {
   const navigate = useNavigate();
@@ -39,7 +40,7 @@ export default function NotificationPage() {
         const fetched = await fetchOrders();
         liveOrders = fetched;
         if (setOrders) setOrders(fetched);
-        localStorage.setItem('orders', JSON.stringify(fetched));
+        cacheOrders(fetched)
       } catch (e) {
         console.error('Failed to fetch orders in NotificationPage:', e);
       }

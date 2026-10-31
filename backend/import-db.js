@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import mysql from 'mysql2/promise';
 import fs from 'fs';
 import path from 'path';
@@ -7,14 +8,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 async function forceImport() {
-  console.log('🔄 กำลังเชื่อมต่อ Aiven เข้า defaultdb...');
+  console.log('🔄 กำลังเชื่อมต่อฐานข้อมูล...');
 
   const connection = await mysql.createConnection({
-    host: 'nn-laundromat-db-nn-laundromat.b.aivencloud.com',
-    port: 25608,
-    user: 'avnadmin',
-    password: 'AVNS_urOw40gC09vBPYKRpMB',
-    database: 'defaultdb',
+    host: process.env.DB_HOST,
+    port: Number(process.env.DB_PORT),
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME || 'defaultdb',
     multipleStatements: true,
     ssl: { rejectUnauthorized: false }
   });

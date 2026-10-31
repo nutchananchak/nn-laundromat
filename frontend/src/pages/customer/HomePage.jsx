@@ -31,6 +31,7 @@ import {
 import BottomNav from '../../components/layout/BottomNav';
 import { useApp } from '../../context/AppContext';
 import { fetchOrders, updateOrder } from '../../api/order';
+import { cacheOrders } from '../../utils/orderCache';
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -91,7 +92,7 @@ export default function HomePage() {
         if (setOrders) {
           setOrders(mergedOrders);
         }
-        localStorage.setItem('orders', JSON.stringify(mergedOrders));
+        cacheOrders(mergedOrders)
       } catch (err) {
         console.error('Failed to sync orders from MySQL:', err);
       }
@@ -254,7 +255,7 @@ export default function HomePage() {
       try {
         const cachedOrders = JSON.parse(localStorage.getItem('orders') || '[]');
         const updatedCache = cachedOrders.map(o => String(o.id) === orderIdStr ? { ...o, viewedCompleted: true } : o);
-        localStorage.setItem('orders', JSON.stringify(updatedCache));
+        cacheOrders(updatedCache)
       } catch (e) {
         console.error(e);
       }
@@ -317,7 +318,7 @@ export default function HomePage() {
         }
         return o;
       });
-      localStorage.setItem('orders', JSON.stringify(updated));
+      cacheOrders(updated)
 
       const currentNotices = JSON.parse(localStorage.getItem('customerNotifications') || '[]');
       const cancelNotice = {

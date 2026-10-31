@@ -20,6 +20,7 @@ import {
 import { useApp } from '../../context/AppContext';
 import { createNewOrder, updateOrder } from '../../api/order';
 import { generatePromptPayQRApi } from '../../api/auth';
+import { cacheOrders } from '../../utils/orderCache';
 
 export default function PaymentPage() {
   const navigate = useNavigate();
@@ -214,7 +215,7 @@ export default function PaymentPage() {
             paymentSlip: null,
             riderBasketImage: null
           }));
-          localStorage.setItem('orders', JSON.stringify(safeStorage.slice(0, 10)));
+          cacheOrders(safeStorage.slice(0, 10))
         } catch (e) {
           console.warn('LocalStorage Quota exceeded, skipped local caching');
         }
@@ -261,7 +262,7 @@ export default function PaymentPage() {
             paymentSlip: null,
             riderBasketImage: null
           }));
-          localStorage.setItem('orders', JSON.stringify(safeStorage.slice(0, 10)));
+         cacheOrders(safeStorage.slice(0, 10))
         } catch (e) {
           console.warn('LocalStorage Quota exceeded, cleared storage cache');
           localStorage.removeItem('orders');

@@ -12,6 +12,7 @@ import {
 import BottomNav from '../../components/layout/BottomNav';
 import { useApp } from '../../context/AppContext';
 import { fetchOrders } from '../../api/order';
+import { cacheOrders } from '../../utils/orderCache';
 
 const getSafeTimestamp = (timestamp, fallbackHourOffset = 0) => {
   if (timestamp && !String(timestamp).includes('เพิ่งสร้าง') && !String(timestamp).includes('วันนี้') && String(timestamp).trim() !== '-') {
@@ -39,7 +40,7 @@ export default function OrdersPage() {
         if (setOrders) {
           setOrders(liveOrders);
         }
-        localStorage.setItem('orders', JSON.stringify(liveOrders));
+        cacheOrders(liveOrders)
       } catch (err) {
         console.error('Failed to sync orders in OrdersPage:', err);
       }

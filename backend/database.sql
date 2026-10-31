@@ -1,24 +1,4 @@
-CREATE DATABASE IF NOT EXISTS nn_laundromat 
-CHARACTER SET utf8mb4 
-COLLATE utf8mb4_unicode_ci;
-
-USE nn_laundromat;
-
--- ปิดการตรวจสอบ Foreign Key ชั่วคราวเพื่อเคลียร์ตารางเก่าได้อย่างปลอดภัย
-SET FOREIGN_KEY_CHECKS = 0;
-DROP TABLE IF EXISTS Customer_Report;
-DROP TABLE IF EXISTS Evidence_Photo;
-DROP TABLE IF EXISTS Order_Special_Items;
-DROP TABLE IF EXISTS Payment;
-DROP TABLE IF EXISTS `Order`;
-DROP TABLE IF EXISTS Service_Pricing;
-DROP TABLE IF EXISTS Service_Type;
-DROP TABLE IF EXISTS Rider;
-DROP TABLE IF EXISTS Admin;
-DROP TABLE IF EXISTS Customer;
-SET FOREIGN_KEY_CHECKS = 1;
-
-CREATE TABLE Customer (
+CREATE TABLE IF NOT EXISTS Customer (
     customer_id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     phone_number VARCHAR(20) NOT NULL UNIQUE,
@@ -27,8 +7,7 @@ CREATE TABLE Customer (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-
-CREATE TABLE Rider (
+CREATE TABLE IF NOT EXISTS Rider (
     rider_id VARCHAR(20) PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     phone_number VARCHAR(20) NOT NULL UNIQUE,
@@ -37,8 +16,7 @@ CREATE TABLE Rider (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-
-CREATE TABLE Admin (
+CREATE TABLE IF NOT EXISTS Admin (
     admin_id VARCHAR(20) PRIMARY KEY,
     username VARCHAR(100) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
@@ -46,16 +24,14 @@ CREATE TABLE Admin (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-
-CREATE TABLE Service_Type (
+CREATE TABLE IF NOT EXISTS Service_Type (
     service_id VARCHAR(50) PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     base_price DECIMAL(10, 2) NOT NULL,
     description TEXT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-
-CREATE TABLE Service_Pricing (
+CREATE TABLE IF NOT EXISTS Service_Pricing (
     pricing_id VARCHAR(50) PRIMARY KEY,
     category ENUM('washDry', 'bedding', 'specialWashDry', 'specialBedding', 'extra') NOT NULL,
     name VARCHAR(150) NOT NULL,
@@ -65,8 +41,7 @@ CREATE TABLE Service_Pricing (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-
-CREATE TABLE `Order` (
+CREATE TABLE IF NOT EXISTS `Order` (
     order_id VARCHAR(50) PRIMARY KEY,
     customer_id INT NULL,
     customer_name VARCHAR(100) NOT NULL,
@@ -83,52 +58,56 @@ CREATE TABLE `Order` (
     plastic_bag_count INT DEFAULT 0,
     note TEXT NULL,
 
-    -- ระบบโปรโมชันสะสมแต้ม 10 ฟรี 1
+    -- โปรโมชันสะสมแต้ม 10 ฟรี 1
     is_reward_used BOOLEAN DEFAULT FALSE,
     discount_amount DECIMAL(10, 2) DEFAULT 0.00,
 
-    -- รูปถ่ายประกอบการดำเนินงาน
-    basket_image LONGTEXT NULL,          -- รูปจุดวางผ้าที่ลูกค้าถ่ายตอนสั่งซื้อ
-    rider_pickup_image LONGTEXT NULL,    -- รูปที่ไรเดอร์ถ่ายตอนไปรับผ้าจากลูกค้า
-    rider_basket_image LONGTEXT NULL,    -- คงไว้เพื่อความเข้ากันได้กับโค้ดเดิม
-    proof_image LONGTEXT NULL,           -- รูปที่ไรเดอร์ถ่ายส่งมอบผ้าคืนลูกค้า
-    
+    -- รูปที่โค้ดใช้จริง (รูปอื่นๆ เก็บใน Evidence_Photo)
+    rider_basket_image LONGTEXT NULL,
+    proof_image LONGTEXT NULL,
+
     -- สถานะขั้นตอนงาน
     status VARCHAR(50) DEFAULT 'pending',
     status_step INT DEFAULT 1,
     status_title VARCHAR(100) DEFAULT 'รอตรวจสอบยอดเงิน',
-    
-    -- การชำระเงินและตรวจสอบสลิป
+
+    -- การชำระเงิน
     payment_status VARCHAR(50) DEFAULT 'pending',
     payment_verified BOOLEAN DEFAULT FALSE,
     payment_rejected BOOLEAN DEFAULT FALSE,
     reject_reason TEXT NULL,
-    
-    -- การยกเลิกและบันทึกยอดเงินคืน (Refund Tracking)
+
+    -- การยกเลิกและคืนเงิน
     cancelled_at VARCHAR(100) NULL,
     cancel_reason TEXT NULL,
     refund_status ENUM('none', 'pending', 'refunded') DEFAULT 'none',
     refund_amount DECIMAL(10, 2) DEFAULT 0.00,
     refunded_at VARCHAR(100) NULL,
 
-    -- การมอบหมายงานไรเดอร์
+    -- การมอบหมายไรเดอร์
     pickup_rider_id VARCHAR(20) NULL,
     delivery_rider_id VARCHAR(20) NULL,
-    
-    -- ไทม์สแตมป์ในแต่ละขั้นตอน
+
+    -- ไทม์สแตมป์ (ข้อความภาษาไทยไว้แสดงผล เพราะหน้าเว็บกรองด้วยข้อความนี้อยู่)
     created_at VARCHAR(100) NOT NULL,
     verified_at VARCHAR(100) NULL,
     picked_up_at VARCHAR(100) NULL,
     delivering_at VARCHAR(100) NULL,
     delivered_at VARCHAR(100) NULL,
-    
+
+    -- เวลาจริงสำหรับเรียงลำดับ (created_at เป็นข้อความ เรียงตามเวลาไม่ได้)
+    created_at_ts DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    INDEX idx_order_phone (customer_phone),
+    INDEX idx_order_step (status_step),
+    INDEX idx_order_created_ts (created_at_ts),
+
     CONSTRAINT fk_order_customer FOREIGN KEY (customer_id) REFERENCES Customer(customer_id) ON DELETE SET NULL,
     CONSTRAINT fk_order_pickup_rider FOREIGN KEY (pickup_rider_id) REFERENCES Rider(rider_id) ON DELETE SET NULL,
     CONSTRAINT fk_order_delivery_rider FOREIGN KEY (delivery_rider_id) REFERENCES Rider(rider_id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-
-CREATE TABLE Order_Special_Items (
+CREATE TABLE IF NOT EXISTS Order_Special_Items (
     item_id INT AUTO_INCREMENT PRIMARY KEY,
     order_id VARCHAR(50) NOT NULL,
     name VARCHAR(100) NOT NULL,
@@ -139,8 +118,8 @@ CREATE TABLE Order_Special_Items (
     CONSTRAINT fk_special_order FOREIGN KEY (order_id) REFERENCES `Order`(order_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-
-CREATE TABLE Payment (
+-- หนึ่งออเดอร์มีหนึ่งการชำระเงิน (โค้ดอัปเดตด้วย WHERE order_id และ JOIN กับ Order)
+CREATE TABLE IF NOT EXISTS Payment (
     payment_id INT AUTO_INCREMENT PRIMARY KEY,
     order_id VARCHAR(50) NOT NULL,
     method VARCHAR(50) DEFAULT 'promptpay',
@@ -150,14 +129,15 @@ CREATE TABLE Payment (
     is_rejected BOOLEAN DEFAULT FALSE,
     reject_reason TEXT NULL,
     uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_payment_order (order_id),
     CONSTRAINT fk_payment_order FOREIGN KEY (order_id) REFERENCES `Order`(order_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-
-CREATE TABLE Evidence_Photo (
+-- photo_type เป็น VARCHAR เพราะโค้ดบันทึกค่า customer_basket, rider_pickup, pickup, delivery
+CREATE TABLE IF NOT EXISTS Evidence_Photo (
     photo_id INT AUTO_INCREMENT PRIMARY KEY,
     order_id VARCHAR(50) NOT NULL,
-    photo_type ENUM('pickup', 'delivery') NOT NULL,
+    photo_type VARCHAR(30) NOT NULL,
     photo_url LONGTEXT NOT NULL,
     uploaded_by_rider_id VARCHAR(20) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -165,8 +145,7 @@ CREATE TABLE Evidence_Photo (
     CONSTRAINT fk_evidence_rider FOREIGN KEY (uploaded_by_rider_id) REFERENCES Rider(rider_id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-
-CREATE TABLE Customer_Report (
+CREATE TABLE IF NOT EXISTS Customer_Report (
     report_id VARCHAR(50) PRIMARY KEY,
     customer_id INT NULL,
     customer_name VARCHAR(100) NOT NULL,
@@ -174,16 +153,18 @@ CREATE TABLE Customer_Report (
     topic VARCHAR(100) NOT NULL,
     detail TEXT NOT NULL,
     status VARCHAR(50) DEFAULT 'pending',
-    created_at VARCHAR(100) NOT NULL
+    created_at VARCHAR(100) NOT NULL,
+    INDEX idx_report_phone (customer_phone)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
- -- ข้อมูลตั้งต้นระบบ
-INSERT INTO Service_Type (service_id, name, base_price) VALUES
+-- ============================================================
+-- ข้อมูลตั้งต้น: INSERT IGNORE จึงรันซ้ำได้ ไม่ทับข้อมูลที่แอดมินแก้ไว้
+-- ============================================================
+INSERT IGNORE INTO Service_Type (service_id, name, base_price) VALUES
 ('wash_dry_fold', 'ซัก อบ พับ', 160.00),
 ('bedding', 'ชุดเครื่องนอน / แยกชิ้น', 200.00);
 
--- โครงสร้างราคาค่าบริการ
-INSERT INTO Service_Pricing (pricing_id, category, name, price, unit, description) VALUES
+INSERT IGNORE INTO Service_Pricing (pricing_id, category, name, price, unit, description) VALUES
 ('S', 'washDry', 'ตะกร้า S (ไม่เกิน 15 ชิ้น)', 160.00, 'ตะกร้า', 'ผ้าไม่เกิน 15 ชิ้น'),
 ('M', 'washDry', 'ตะกร้า M (ไม่เกิน 35 ชิ้น)', 180.00, 'ตะกร้า', 'ผ้าไม่เกิน 35 ชิ้น'),
 ('L', 'washDry', 'ตะกร้า L (ไม่เกิน 65 ชิ้น)', 240.00, 'ตะกร้า', 'ผ้าไม่เกิน 65 ชิ้น'),
@@ -207,18 +188,16 @@ INSERT INTO Service_Pricing (pricing_id, category, name, price, unit, descriptio
 ('duvet_6', 'specialBedding', 'ผ้านวม 6 ฟุต', 180.00, 'ผืน', 'ผ้านวมแยกผืน'),
 ('extra_bag', 'extra', 'ถุงพลาสติกใส่ผ้า', 5.00, 'ใบ', 'ถุงกันเปื้อนสำหรับจัดส่ง');
 
--- พนักงานไรเดอร์ประจำระบบ (พร้อมสถานะปฏิบัติงาน)
-INSERT INTO Rider (rider_id, name, phone_number, password, status) VALUES
+-- รหัสผ่านตั้งต้นเป็นข้อความธรรมดา ต้องเปลี่ยนหลังติดตั้งจริง (ดูหมายเหตุเรื่อง bcrypt)
+INSERT IGNORE INTO Rider (rider_id, name, phone_number, password, status) VALUES
 ('RD-01', 'วรรณา สีดา', '0942855891', 'rider1', 'active'),
 ('RD-02', 'วันดี ทองอ่อน', '0831887742', 'rider2', 'active'),
 ('RD-03', 'สตาร์ วินเพียว', '0840788915', 'rider3', 'inactive');
 
--- ผู้ดูแลระบบ Admin
-INSERT INTO Admin (admin_id, username, name, password) VALUES
+INSERT IGNORE INTO Admin (admin_id, username, name, password) VALUES
 ('ADM-01', 'admin@nnlaundromat.com', 'ฝ่ายปฏิบัติการกลาง', 'admin123'),
 ('ADM-02', 'manager', 'ผู้จัดการ', 'admin123');
 
--- สรุปตรวจสอบความพร้อมของข้อมูล
 SELECT 'Riders Ready' AS Status, COUNT(*) AS Total FROM Rider;
 SELECT 'Admins Ready' AS Status, COUNT(*) AS Total FROM Admin;
 SELECT 'Services Ready' AS Status, COUNT(*) AS Total FROM Service_Type;

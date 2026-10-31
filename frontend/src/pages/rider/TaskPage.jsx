@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { fetchOrders, updateOrder } from '../../api/order';
+import { cacheOrders } from '../../utils/orderCache';
 
 const TaskPage = () => {
   const navigate = useNavigate();
@@ -78,7 +79,7 @@ const TaskPage = () => {
       if (setOrders) {
         setOrders(data);
       }
-      localStorage.setItem('orders', JSON.stringify(data));
+      cacheOrders(data)
     } catch (err) {
       console.error('Error fetching orders:', err);
       triggerToast('โหลดข้อมูลงานไม่สำเร็จ', 'error');
