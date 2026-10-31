@@ -1,4 +1,5 @@
 import pool from '../config/db.js';
+import { uploadImage } from '../utils/cloudinary.js';
 
 const getNextRunningOrderId = async (connection) => {
   const [rows] = await connection.query(`
@@ -177,6 +178,11 @@ export const createOrder = async (req, res) => {
     await connection.beginTransaction();
 
     const data = req.body;
+        data.slipImage = await uploadImage(data.slipImage, 'slips');
+        data.customerBasketImage = await uploadImage(
+        data.customerBasketImage || data.basketImage || data.riderBasketImage || null,
+        'basket'
+    );
     const orderId = await getNextRunningOrderId(connection);
     const cleanPhone = String(data.customerPhone || '0800000000').replace(/\D/g, '');
 
@@ -324,6 +330,12 @@ export const updateOrderStatus = async (req, res) => {
 
     const { id } = req.params;
     const body = req.body;
+        body.slipImage = await uploadImage(body.slipImage, 'slips');
+        body.riderPickupImage = await uploadImage(body.riderPickupImage, 'pickup');
+        body.riderBasketImage = await uploadImage(body.riderBasketImage, 'pickup');
+    const deliveryUrl = await uploadImage(body.proofImage || body.riderDeliveryImage, 'delivery');
+        body.proofImage = deliveryUrl;
+        body.riderDeliveryImage = deliveryUrl;
 
     const orderFields = [];
     const orderValues = [];
