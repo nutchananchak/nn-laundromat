@@ -2,22 +2,8 @@ import { createContext, useContext, useState, useEffect } from 'react';
 
 const AppContext = createContext();
 
-const stripImagesForStorage = (ordersList) => {
-  if (!ordersList || !Array.isArray(ordersList)) return [];
-  return ordersList.slice(0, 15).map(o => ({
-    ...o,
-    slipImage: null,
-    paymentSlip: null,
-    riderBasketImage: null,
-    riderPickupImage: null,
-    proofImage: null,
-    riderDeliveryImage: null,
-    basketImage: null,
-    customerBasketImage: null
-  }));
-};
-
 export function AppProvider({ children }) {
+  // 1. ข้อมูลผู้ใช้ฝั่งลูกค้า (Customer Session)
   const [userProfile, setUserProfile] = useState(() => {
     try {
       const savedUser = localStorage.getItem('currentUser') || localStorage.getItem('userProfile');
@@ -53,15 +39,17 @@ export function AppProvider({ children }) {
   };
 
   const logoutUser = () => {
-    localStorage.removeItem('currentUser');
-    localStorage.removeItem('userProfile');
-    localStorage.removeItem('last_visited_path');
+    try {
+      localStorage.removeItem('currentUser');
+      localStorage.removeItem('userProfile');
+      localStorage.removeItem('last_visited_path');
+    } catch (e) {}
     setUserProfile(null);
     setAddresses([]);
     setSelectedAddressId(null);
   };
 
-
+  // 2. ข้อมูลพนักงานรับ-ส่งผ้า (Rider Session)
   const [currentRider, setCurrentRider] = useState(() => {
     try {
       const savedRider = localStorage.getItem('currentRider');
@@ -80,11 +68,13 @@ export function AppProvider({ children }) {
 
   const logoutRider = () => {
     setCurrentRider(null);
-    localStorage.removeItem('currentRider');
-    localStorage.removeItem('last_visited_path');
+    try {
+      localStorage.removeItem('currentRider');
+      localStorage.removeItem('last_visited_path');
+    } catch (e) {}
   };
 
-
+  // 3. หมุดที่อยู่ลูกค้า
   const [addresses, setAddresses] = useState([]);
   const [selectedAddressId, setSelectedAddressId] = useState(null);
 
@@ -140,27 +130,15 @@ export function AppProvider({ children }) {
     } catch (e) {}
   };
 
+  // 4. รายการออเดอร์ (เก็บใน React State ล้วนๆ ไม่ยัดลง localStorage อีกต่อไป)
+  const [orders, setOrders] = useState([]);
 
-  const [orders, setOrders] = useState(() => {
-    try {
-      const savedOrders = localStorage.getItem('orders');
-      if (savedOrders) {
-        return JSON.parse(savedOrders);
-      }
-    } catch (e) {}
-    return [];
-  });
-
+  // ล้างแคช orders เก่าที่ตกค้างใน localStorage ทิ้งทันทีเมื่อเปิดแอป
   useEffect(() => {
     try {
-      const safeOrders = stripImagesForStorage(orders);
-      localStorage.setItem('orders', JSON.stringify(safeOrders));
-    } catch (e) {
-      try {
-        localStorage.removeItem('orders');
-      } catch (err) {}
-    }
-  }, [orders]);
+      localStorage.removeItem('orders');
+    } catch (e) {}
+  }, []);
 
   const currentAddress = addresses.length > 0 
     ? (addresses.find(a => a.id === selectedAddressId) || addresses[0]) 
