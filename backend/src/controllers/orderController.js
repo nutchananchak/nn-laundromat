@@ -84,7 +84,9 @@ export const getOrders = async (req, res) => {
 
       photos.forEach(p => {
         if (p.photo_type === 'delivery' || p.photo_type === 'delivery_proof') proofImage = p.photo_url;
-        if (p.photo_type === 'pickup' || p.photo_type === 'rider_basket') riderBasketImage = p.photo_url;
+        if (p.photo_type === 'pickup' || p.photo_type === 'rider_basket' || p.photo_type === 'customer_place') {
+          riderBasketImage = p.photo_url;
+        }
       });
 
       // ดึงรายการพิเศษ
@@ -178,7 +180,6 @@ export const createOrder = async (req, res) => {
     const actualServiceName = services.length > 0 ? services[0].name : (data.serviceName || 'ซัก อบ พับ');
 
     // 3. บันทึกลงตาราง `Order`
-    // สำคัญ: rider_basket_image ตอนนี้ต้องเป็น null เสมอ เพราะเพิ่งสั่ง ไรเดอร์ยังไม่ได้รับผ้า
     const insertOrderSql = `
       INSERT INTO \`Order\` (
         order_id, customer_id, customer_name, customer_phone,
@@ -208,7 +209,7 @@ export const createOrder = async (req, res) => {
       Number(data.totalPrice || 0),
       Number(data.plasticBagCount || 0),
       data.note || '',
-      null, // rider_basket_image ต้องเป็น null เสมอในขั้นตอนนี้
+      null, // rider_basket_image เป็น null รอไรเดอร์มารับผ้า
       data.status || 'pending',
       Number(data.statusStep || 1),
       data.statusTitle || 'รอตรวจสอบสลิป',
@@ -218,11 +219,11 @@ export const createOrder = async (req, res) => {
       data.createdAt || new Date().toLocaleString('th-TH')
     ]);
 
-    // หากลูกค้ามีรูปจุดวางผ้า ให้บันทึกเป็น customer_place ใน Evidence_Photo แยกไว้ต่างหาก
+    // บันทึกรูปถ่ายจุดวางผ้า: ใช้ค่า 'pickup' เพื่อให้ตรงตาม ENUM และความยาวคอลัมน์ของฐานข้อมูล
     if (data.riderBasketImage || data.basketImage) {
       await connection.query(
         'INSERT INTO Evidence_Photo (order_id, photo_type, photo_url) VALUES (?, ?, ?)',
-        [orderId, 'customer_place', data.riderBasketImage || data.basketImage]
+        [orderId, 'pickup', data.riderBasketImage || data.basketImage]
       );
     }
 
@@ -353,8 +354,7 @@ export const updateOrderStatus = async (req, res) => {
         orderValues
       );
     }
-
-    // บันทึกรูปถ่ายลง Evidence_Photo
+    
     if (body.proofImage) {
       await connection.query(
         'INSERT INTO Evidence_Photo (order_id, photo_type, photo_url) VALUES (?, ?, ?)',
