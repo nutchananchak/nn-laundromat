@@ -18,10 +18,9 @@ const stripImagesForStorage = (ordersList) => {
 };
 
 export function AppProvider({ children }) {
-  // 1. ข้อมูลผู้ใช้ฝั่งลูกค้า (Customer)
   const [userProfile, setUserProfile] = useState(() => {
     try {
-      const savedUser = localStorage.getItem('currentUser');
+      const savedUser = localStorage.getItem('currentUser') || localStorage.getItem('userProfile');
       if (savedUser) {
         const parsed = JSON.parse(savedUser);
         return {
@@ -32,7 +31,9 @@ export function AppProvider({ children }) {
           avatar: parsed.avatar || null,
         };
       }
-    } catch (e) {}
+    } catch (e) {
+      console.error('Failed to load persisted user', e);
+    }
     return null;
   });
 
@@ -45,18 +46,22 @@ export function AppProvider({ children }) {
       avatar: userData.avatar || null,
     };
     setUserProfile(formattedUser);
-    localStorage.setItem('currentUser', JSON.stringify(formattedUser));
+    try {
+      localStorage.setItem('currentUser', JSON.stringify(formattedUser));
+      localStorage.setItem('userProfile', JSON.stringify(formattedUser));
+    } catch (e) {}
   };
 
   const logoutUser = () => {
     localStorage.removeItem('currentUser');
     localStorage.removeItem('userProfile');
+    localStorage.removeItem('last_visited_path');
     setUserProfile(null);
     setAddresses([]);
     setSelectedAddressId(null);
   };
 
-  // 2. ข้อมูลพนักงานรับ-ส่งผ้า (Rider Session)
+
   const [currentRider, setCurrentRider] = useState(() => {
     try {
       const savedRider = localStorage.getItem('currentRider');
@@ -68,15 +73,18 @@ export function AppProvider({ children }) {
 
   const loginRider = (riderData) => {
     setCurrentRider(riderData);
-    localStorage.setItem('currentRider', JSON.stringify(riderData));
+    try {
+      localStorage.setItem('currentRider', JSON.stringify(riderData));
+    } catch (e) {}
   };
 
   const logoutRider = () => {
     setCurrentRider(null);
     localStorage.removeItem('currentRider');
+    localStorage.removeItem('last_visited_path');
   };
 
-  // 3. หมุดที่อยู่ลูกค้า
+
   const [addresses, setAddresses] = useState([]);
   const [selectedAddressId, setSelectedAddressId] = useState(null);
 
@@ -114,21 +122,25 @@ export function AppProvider({ children }) {
     if (!userProfile?.phone && !userProfile?.id) return;
     const currentKey = `addresses_${userProfile.phone || userProfile.id}`;
     setAddresses(newList);
-    localStorage.setItem(currentKey, JSON.stringify(newList));
+    try {
+      localStorage.setItem(currentKey, JSON.stringify(newList));
+    } catch (e) {}
   };
 
   const updateSelectedAddressIdForUser = (newId) => {
     if (!userProfile?.phone && !userProfile?.id) return;
     const currentSelectKey = `selectedAddressId_${userProfile.phone || userProfile.id}`;
     setSelectedAddressId(newId);
-    if (newId) {
-      localStorage.setItem(currentSelectKey, newId);
-    } else {
-      localStorage.removeItem(currentSelectKey);
-    }
+    try {
+      if (newId) {
+        localStorage.setItem(currentSelectKey, newId);
+      } else {
+        localStorage.removeItem(currentSelectKey);
+      }
+    } catch (e) {}
   };
 
-  // 4. รายการออเดอร์
+
   const [orders, setOrders] = useState(() => {
     try {
       const savedOrders = localStorage.getItem('orders');
@@ -141,7 +153,6 @@ export function AppProvider({ children }) {
 
   useEffect(() => {
     try {
-      // เซฟเฉพาะข้อมูลโครงสร้าง ตัดรูปขนาดใหญ่ออกทั้งหมด ป้องกัน QuotaExceededError
       const safeOrders = stripImagesForStorage(orders);
       localStorage.setItem('orders', JSON.stringify(safeOrders));
     } catch (e) {
