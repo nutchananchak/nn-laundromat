@@ -163,27 +163,12 @@ const DashboardPage = () => {
     }, 2800);
   };
 
-  // ดึงข้อมูลออเดอร์จาก API MySQL (ตัดการยัด Base64 ลง localStorage เพื่อแก้ปัญหา QuotaExceededError ถาวร)
+  // ดึงข้อมูลออเดอร์จาก API MySQL (ไม่ยัด Base64 ลงแคช ป้องกัน Quota Exceeded)
   const loadOrdersFromApi = async () => {
     try {
       const data = await fetchOrders();
       if (setOrders) {
         setOrders(data || []);
-      }
-      // เซฟแคชสำรองเฉพาะข้อมูลตัวหนังสือเบาๆ สูงสุด 20 รายการ
-      try {
-        const safeCache = (data || []).slice(0, 20).map(o => ({
-          ...o,
-          slipImage: null,
-          proofImage: null,
-          riderBasketImage: null,
-          riderPickupImage: null,
-          riderDeliveryImage: null,
-          basketImage: null
-        }));
-        localStorage.setItem('orders', JSON.stringify(safeCache));
-      } catch (storageErr) {
-        localStorage.removeItem('orders');
       }
     } catch (err) {
       console.error('Failed to load orders in admin:', err);
@@ -520,7 +505,15 @@ const DashboardPage = () => {
     }
   });
 
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  // ปฏิทินวันหยุด: ตั้งค่าเริ่มต้นเป็นวันที่ปัจจุบันในรูปแบบ YYYY-MM-DD
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, '0');
+    const d = String(today.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  });
+
   const [closedDates, setClosedDates] = useState(() => {
     try {
       const saved = localStorage.getItem('closedDates');
@@ -2781,10 +2774,12 @@ const DashboardPage = () => {
             </div>
           )}
 
-          {/* ======================= แท็บ 10: ปฏิทินร้าน ======================= */}
+          {/* ======================= แท็บ 10: ปฏิทินร้าน (แก้ปัญหา Timezone Offset 100%) ======================= */}
           {activeTab === 'calendar' && (() => {
-            const curYear = new Date(selectedDate).getFullYear();
-            const curMonth = new Date(selectedDate).getMonth();
+            // สกัดปีและเดือนจากสตริง YYYY-MM-DD โดยตรง (ไม่พึ่งพา new Date().getMonth() ป้องกัน timezone ย้อนกลับ)
+            const [yearStr, monthStr] = selectedDate.split('-');
+            const curYear = parseInt(yearStr, 10);
+            const curMonth = parseInt(monthStr, 10) - 1; // 0-indexed สำหรับเดือน
 
             const daysInMonth = new Date(curYear, curMonth + 1, 0).getDate();
             const firstDayOfWeek = new Date(curYear, curMonth, 1).getDay();
@@ -2864,13 +2859,14 @@ const DashboardPage = () => {
                     </div>
 
                     <div className="flex items-center gap-2.5">
+                      {/* Dropdown เลือกเดือน */}
                       <div className="relative inline-flex items-center">
                         <select
                           value={curMonth}
                           onChange={(e) => {
                             const newM = Number(e.target.value);
-                            const d = new Date(curYear, newM, 1);
-                            setSelectedDate(d.toISOString().split('T')[0]);
+                            const formattedMonth = String(newM + 1).padStart(2, '0');
+                            setSelectedDate(`${curYear}-${formattedMonth}-01`);
                           }}
                           className="appearance-none bg-white border border-slate-200 hover:border-[#1d61f2] focus:border-[#1d61f2] rounded-2xl pl-3.5 pr-8 py-2 text-xs font-bold text-slate-700 outline-none cursor-pointer transition shadow-2xs"
                         >
@@ -2881,18 +2877,19 @@ const DashboardPage = () => {
                         <ChevronDown size={14} className="text-slate-400 absolute right-2.5 pointer-events-none" />
                       </div>
 
+                      {/* Dropdown เลือกปี */}
                       <div className="relative inline-flex items-center">
                         <select
                           value={curYear}
                           onChange={(e) => {
                             const newY = Number(e.target.value);
-                            const d = new Date(newY, curMonth, 1);
-                            setSelectedDate(d.toISOString().split('T')[0]);
+                            const formattedMonth = String(curMonth + 1).padStart(2, '0');
+                            setSelectedDate(`${newY}-${formattedMonth}-01`);
                           }}
                           className="appearance-none bg-white border border-slate-200 hover:border-[#1d61f2] focus:border-[#1d61f2] rounded-2xl pl-3.5 pr-8 py-2 text-xs font-bold text-slate-700 outline-none cursor-pointer transition shadow-2xs"
                         >
                           <option value={2026}>พ.ศ. 2569</option>
-                          <option value={2027}>ปี พ.ศ. 2570 (2027)</option>
+                          <option value={2027}>พ.ศ. 2570</option>
                         </select>
                         <ChevronDown size={14} className="text-slate-400 absolute right-2.5 pointer-events-none" />
                       </div>
