@@ -79,7 +79,7 @@ export default function TaskDetailPage() {
         const found = all.find((o) => String(o.id) === String(id));
         if (found) {
           setOrder(found);
-          setProofImage(getInitialProofImage(found));
+          setProofImage((prev) => prev || getInitialProofImage(found));
         }
       } catch (err) {
         console.error('Fetch order detail failed:', err);
