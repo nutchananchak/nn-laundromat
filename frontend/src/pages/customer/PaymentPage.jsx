@@ -103,7 +103,7 @@ export default function PaymentPage() {
     if (isLine) {
       showAlert(
         'บันทึกรูปภาพใน LINE',
-        'ระบบของ LINE ไม่อนุญาตให้ดาวน์โหลดไฟล์ลงเครื่องอัตโนมัติ กรุณากด "แตะค้างที่รูป QR Code" ด้านบน แล้วเลือก "บันทึกรูปภาพ" ครับ'
+        'ระบบของ LINE ไม่อนุญาตให้ดาวน์โหลดไฟล์ลงเครื่องอัตโนมัติ กรุณากด "แตะค้างที่รูป QR Code" ด้านบน แล้วเลือก "บันทึกรูปภาพ"'
       );
       return;
     }
@@ -467,7 +467,7 @@ export default function PaymentPage() {
                   {isDownloadingQr ? 'กำลังเปิดรูปภาพ...' : 'บันทึกรูป QR Code'}
                 </button>
                 <span className="text-[11px] text-amber-600 font-bold mt-2.5 block bg-amber-50 px-3 py-1 rounded-lg border border-amber-200/60">
-                  💡 หากใช้ผ่าน LINE: โปรดกด "แตะค้างที่รูป QR Code" ด้านบนเพื่อกดบันทึกรูปภาพ
+                   หากใช้ผ่าน LINE โปรดกด "แตะค้างที่รูป QR Code" ด้านบนเพื่อกดบันทึกรูปภาพ
                 </span>
               </>
             ) : (
