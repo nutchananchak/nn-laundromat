@@ -163,7 +163,6 @@ const DashboardPage = () => {
     }, 2800);
   };
 
-  // ดึงข้อมูลออเดอร์จาก API MySQL (ไม่ยัด Base64 ลงแคช ป้องกัน Quota Exceeded)
   const loadOrdersFromApi = async () => {
     try {
       const data = await fetchOrders();
@@ -214,7 +213,6 @@ const DashboardPage = () => {
     reason: 'ยอดเงินไม่ถูกต้อง หรือภาพสลิปไม่ชัดเจน'
   });
 
-  // ยกเลิกออเดอร์ฉุกเฉิน
   const [emergencyCancelModal, setEmergencyCancelModal] = useState({
     isOpen: false,
     orderId: null,
@@ -505,14 +503,9 @@ const DashboardPage = () => {
     }
   });
 
-  // ปฏิทินวันหยุด: ตั้งค่าเริ่มต้นเป็นวันที่ปัจจุบันในรูปแบบ YYYY-MM-DD
-  const [selectedDate, setSelectedDate] = useState(() => {
-    const today = new Date();
-    const y = today.getFullYear();
-    const m = String(today.getMonth() + 1).padStart(2, '0');
-    const d = String(today.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  });
+  // แยก State เดือนและปีของปฏิทินร้านออกจากกันแบบตรงไปตรงมา ป้องกันปัญหา Timezone Offset 100%
+  const [calendarYear, setCalendarYear] = useState(2026);
+  const [calendarMonth, setCalendarMonth] = useState(9); // ค่าเริ่มต้น: เดือนตุลาคม (index 9)
 
   const [closedDates, setClosedDates] = useState(() => {
     try {
@@ -1248,7 +1241,6 @@ const DashboardPage = () => {
               )}
             </button>
 
-            {/* ออเดอร์กำลังดำเนินการ */}
             <button
               onClick={() => handleTabChange('in_progress')}
               className={`w-full flex items-center ${isSidebarOpen ? 'justify-between px-3.5' : 'justify-center px-0'} py-3 rounded-2xl text-sm font-bold transition cursor-pointer relative group ${
@@ -1268,7 +1260,6 @@ const DashboardPage = () => {
               )}
             </button>
 
-            {/* จัดการไรเดอร์และสถิติงาน */}
             <button
               onClick={() => handleTabChange('riders')}
               className={`w-full flex items-center ${isSidebarOpen ? 'justify-between px-3.5' : 'justify-center px-0'} py-3 rounded-2xl text-sm font-bold transition cursor-pointer relative group ${
@@ -1286,7 +1277,6 @@ const DashboardPage = () => {
               )}
             </button>
 
-            {/* ปรับโครงสร้างราคา */}
             <button
               onClick={() => handleTabChange('pricing')}
               className={`w-full flex items-center ${isSidebarOpen ? 'gap-3 px-3.5' : 'justify-center px-0'} py-3 rounded-2xl text-sm font-bold transition cursor-pointer relative group ${
@@ -1349,7 +1339,6 @@ const DashboardPage = () => {
               {isSidebarOpen && <span className="truncate">สรุปรายรับ &amp; กราฟ</span>}
             </button>
 
-            {/* สถิติดูแลลูกค้าต่อปี */}
             <button
               onClick={() => handleTabChange('customers')}
               className={`w-full flex items-center ${isSidebarOpen ? 'gap-3 px-3.5' : 'justify-center px-0'} py-3 rounded-2xl text-sm font-bold transition cursor-pointer relative group ${
@@ -2089,7 +2078,7 @@ const DashboardPage = () => {
                         <th className="py-4 px-5 text-right">ยอดรวมสะสม (ปีนี้)</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-slate-100 bg-white">
                       {customerAnnualStats.map((cust, idx) => (
                         <tr key={cust.phone} className="hover:bg-slate-50/50">
                           <td className="py-4 px-5 font-bold text-slate-900 flex items-center gap-2">
@@ -2774,22 +2763,18 @@ const DashboardPage = () => {
             </div>
           )}
 
-          {/* ======================= แท็บ 10: ปฏิทินร้าน (แก้ปัญหา Timezone Offset 100%) ======================= */}
+          {/* ======================= แท็บ 10: ปฏิทินร้าน (แก้ไขการเลือกเดือน/ปี แบบเสถียร 100%) ======================= */}
           {activeTab === 'calendar' && (() => {
-            // สกัดปีและเดือนจากสตริง YYYY-MM-DD โดยตรง (ไม่พึ่งพา new Date().getMonth() ป้องกัน timezone ย้อนกลับ)
-            const [yearStr, monthStr] = selectedDate.split('-');
-            const curYear = parseInt(yearStr, 10);
-            const curMonth = parseInt(monthStr, 10) - 1; // 0-indexed สำหรับเดือน
-
-            const daysInMonth = new Date(curYear, curMonth + 1, 0).getDate();
-            const firstDayOfWeek = new Date(curYear, curMonth, 1).getDay();
+            // คำนวณจำนวนวันในเดือน และวันแรกของสัปดาห์โดยใช้ State ตัวเลขโดยตรง
+            const daysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
+            const firstDayOfWeek = new Date(calendarYear, calendarMonth, 1).getDay();
 
             const monthDays = [];
             for (let i = 0; i < firstDayOfWeek; i++) {
               monthDays.push(null);
             }
             for (let d = 1; d <= daysInMonth; d++) {
-              const formattedDate = `${curYear}-${String(curMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+              const formattedDate = `${calendarYear}-${String(calendarMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
               monthDays.push({ day: d, dateStr: formattedDate });
             }
 
@@ -2859,15 +2844,11 @@ const DashboardPage = () => {
                     </div>
 
                     <div className="flex items-center gap-2.5">
-                      {/* Dropdown เลือกเดือน */}
+                      {/* Dropdown เลือกเดือน (0 = ม.ค., 8 = ก.ย., 9 = ต.ค., 10 = พ.ย., 11 = ธ.ค.) */}
                       <div className="relative inline-flex items-center">
                         <select
-                          value={curMonth}
-                          onChange={(e) => {
-                            const newM = Number(e.target.value);
-                            const formattedMonth = String(newM + 1).padStart(2, '0');
-                            setSelectedDate(`${curYear}-${formattedMonth}-01`);
-                          }}
+                          value={calendarMonth}
+                          onChange={(e) => setCalendarMonth(Number(e.target.value))}
                           className="appearance-none bg-white border border-slate-200 hover:border-[#1d61f2] focus:border-[#1d61f2] rounded-2xl pl-3.5 pr-8 py-2 text-xs font-bold text-slate-700 outline-none cursor-pointer transition shadow-2xs"
                         >
                           {thaiMonths.map(m => (
@@ -2880,16 +2861,12 @@ const DashboardPage = () => {
                       {/* Dropdown เลือกปี */}
                       <div className="relative inline-flex items-center">
                         <select
-                          value={curYear}
-                          onChange={(e) => {
-                            const newY = Number(e.target.value);
-                            const formattedMonth = String(curMonth + 1).padStart(2, '0');
-                            setSelectedDate(`${newY}-${formattedMonth}-01`);
-                          }}
+                          value={calendarYear}
+                          onChange={(e) => setCalendarYear(Number(e.target.value))}
                           className="appearance-none bg-white border border-slate-200 hover:border-[#1d61f2] focus:border-[#1d61f2] rounded-2xl pl-3.5 pr-8 py-2 text-xs font-bold text-slate-700 outline-none cursor-pointer transition shadow-2xs"
                         >
                           <option value={2026}>พ.ศ. 2569</option>
-                          <option value={2027}>พ.ศ. 2570</option>
+                          <option value={2027}>ปี พ.ศ. 2570</option>
                         </select>
                         <ChevronDown size={14} className="text-slate-400 absolute right-2.5 pointer-events-none" />
                       </div>
