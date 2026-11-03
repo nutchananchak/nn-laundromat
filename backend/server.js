@@ -12,6 +12,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.resolve(__dirname, '.env') });
+  if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+  console.error('❌ ต้องตั้งค่า JWT_SECRET (อย่างน้อย 32 ตัวอักษร) ใน Environment');
+  process.exit(1);
+}
 
 console.log('----------------------------------------');
 console.log('🔍 [ENV CHECK] SMS API KEY:', process.env.THAIBULKSMS_API_KEY ? 'โหลดสำเร็จ' : 'ไม่พบ (undefined)');
@@ -21,45 +25,23 @@ console.log('----------------------------------------');
 const app = express();
 const PORT = process.env.PORT || 5001;
 
+// อยู่หลัง proxy ของ Render ต้องตั้งค่านี้ ไม่งั้น rate limit จะนับทุกคนเป็น IP เดียวกัน
+app.set('trust proxy', 1);
+
 const allowedOrigins = [
   'https://nn-laundromat.vercel.app',
   process.env.FRONTEND_URL,
   'http://localhost:5173',
-  'http://localhost:3000'
 ].filter(Boolean);
 
-const corsOptions = {
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(null, true);
-    }
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'));
   },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Cache-Control', 'Pragma']
-};
-
-app.use(cors(corsOptions));
-
-// ดักจับ Preflight OPTIONS Request ทุกกรณีและตอบกลับ 200 ทันที
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (!origin || allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin || '*');
-  } else {
-    res.header('Access-Control-Allow-Origin', '*');
-  }
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Cache-Control, Pragma');
-  res.header('Access-Control-Allow-Credentials', 'true');
-
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
-  }
-  next();
-});
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Cache-Control', 'Pragma'],
+}));
 
 // Middleware ป้องกัน 304 Cache HIT สำหรับ API ทุกเส้นทาง บังคับดึงข้อมูลสดเสมอ
 app.use('/api', (req, res, next) => {

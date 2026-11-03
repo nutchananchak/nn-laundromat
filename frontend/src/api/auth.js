@@ -10,8 +10,8 @@ export const registerApi = async (userData) => {
   return response.data;
 };
 
-export const forgotPasswordApi = async (phone_number, new_password, role = 'customer') => {
-  const response = await client.post('/auth/forgot-password', { phone_number, new_password, role });
+export const forgotPasswordApi = async (phone_number, new_password, role = 'customer', reset_token = '') => {
+  const response = await client.post('/auth/forgot-password', { phone_number, new_password, role, reset_token });
   return response.data;
 };
 

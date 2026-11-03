@@ -116,6 +116,10 @@ export default function OrderDetailPage() {
     };
 
     fetchLiveDetail();
+   const timer = setInterval(() => {
+      if (!document.hidden) fetchLiveDetail();
+    }, 15000);
+    return () => clearInterval(timer);
   }, [id, setOrders]);
 
   const order = useMemo(() => {

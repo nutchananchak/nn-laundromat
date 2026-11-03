@@ -41,6 +41,7 @@ export function AppProvider({ children }) {
   const logoutUser = () => {
     try {
       localStorage.removeItem('currentUser');
+      localStorage.removeItem('token');
       localStorage.removeItem('userProfile');
       localStorage.removeItem('last_visited_path');
     } catch (e) {}
@@ -70,6 +71,7 @@ export function AppProvider({ children }) {
     setCurrentRider(null);
     try {
       localStorage.removeItem('currentRider');
+      localStorage.removeItem('token');
       localStorage.removeItem('last_visited_path');
     } catch (e) {}
   };

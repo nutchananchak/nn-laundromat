@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { handleAuthError } from './session';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://nn-laundromat-api.onrender.com/api';
 const client = axios.create({
@@ -10,5 +11,7 @@ client.interceptors.request.use((config) => {
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
+
+client.interceptors.response.use((res) => res, handleAuthError);
 
 export default client;

@@ -3,6 +3,7 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import pool from '../config/db.js';
 import axios from 'axios';
+import { signToken, verifyToken } from '../middleware/auth.js';
 import bcrypt from 'bcryptjs';
 
 const isHashed = (s) => /^\$2[aby]\$\d{2}\$/.test(String(s || ''));
@@ -79,7 +80,7 @@ export const login = async (req, res) => {
           name: admin.name, 
           role: 'admin' 
         },
-        token: `mock-token-admin-${admin.id}`
+        token: `signToken({ role: 'admin', id: admin.id }, '1d')`
       });
     }
 
@@ -106,7 +107,7 @@ export const login = async (req, res) => {
       return res.status(200).json({
         success: true,
         user: { id: rider.id, name: rider.name, phone: rider.phone_number, role: 'rider' },
-        token: `mock-token-rider-${rider.id}`
+        token: `signToken({ role: 'rider', id: rider.id }, '2d')`
       });
     }
 
@@ -143,7 +144,7 @@ export const login = async (req, res) => {
         address: customer.address,
         role: 'customer'
       },
-      token: `mock-token-customer-${customer.id}`
+      token: `signToken({ role: 'customer', id: customer.id, phone: customer.phone_number })`
     });
   } catch (error) {
     console.error('Error during login:', error);
@@ -190,7 +191,7 @@ export const register = async (req, res) => {
         address: cleanAddress, 
         role: 'customer' 
       },
-      token: `mock-token-customer-${result.insertId}`
+      token: `signToken({ role: 'customer', id: result.insertId, phone: cleanPhone })`
     });
   } catch (error) {
     console.error('Error during register:', error);
@@ -201,7 +202,7 @@ export const register = async (req, res) => {
 // 3. รีเซ็ตรหัสผ่าน (Forgot Password)
 export const forgotPassword = async (req, res) => {
   try {
-    const { phone_number, new_password, role } = req.body;
+    const { phone_number, new_password, role, reset_token } = req.body;
 
     if (!phone_number || !new_password) {
       return res.status(400).json({ message: 'กรุณาระบุเบอร์โทรศัพท์และรหัสผ่านใหม่' });
@@ -210,6 +211,22 @@ export const forgotPassword = async (req, res) => {
     const rawPhone = String(phone_number).trim();
     const cleanPhone = normalizePhone(rawPhone);
     const cleanNewPassword = String(new_password).trim();
+
+    if (cleanNewPassword.length < 6 || cleanNewPassword.length > 20) {
+      return res.status(400).json({ message: 'รหัสผ่านต้องยาว 6–20 ตัวอักษร' });
+    }
+
+    // ต้องผ่านการยืนยัน OTP ของเบอร์นี้มาก่อน
+    let claims;
+    try {
+      claims = verifyToken(reset_token);
+    } catch (e) {
+      return res.status(401).json({ message: 'การยืนยัน OTP หมดอายุ กรุณาขอรหัสใหม่' });
+    }
+    if (claims.purpose !== 'reset' || claims.phone !== cleanPhone) {
+      return res.status(403).json({ message: 'การยืนยัน OTP ไม่ตรงกับเบอร์นี้' });
+    }
+
     const table = role === 'rider' ? 'Rider' : 'Customer';
 
     const [result] = await pool.query(
@@ -241,6 +258,9 @@ export const getProfile = async (req, res) => {
     );
 
     if (customers.length === 0) {
+          if (String(customers[0].id) !== String(req.user.id)) {
+      return res.status(403).json({ message: 'ไม่มีสิทธิ์ดูข้อมูลนี้' });
+    }
       return res.status(404).json({ message: 'ไม่พบข้อมูลโปรไฟล์' });
     }
 
@@ -274,6 +294,9 @@ export const updateProfile = async (req, res) => {
 
     const targetCustomer = currentUser[0];
     const targetCustomerId = targetCustomer.customer_id;
+        if (String(targetCustomerId) !== String(req.user.id)) {
+      return res.status(403).json({ message: 'ไม่มีสิทธิ์แก้ไขข้อมูลนี้' });
+    }
 
     // 2. ถ้าเปลี่ยนเบอร์ ต้องตรวจก่อนว่าบัญชีอื่นถือเบอร์นี้อยู่หรือไม่
     if (cleanNewPhone && cleanNewPhone !== normalizePhone(targetCustomer.phone_number)) {

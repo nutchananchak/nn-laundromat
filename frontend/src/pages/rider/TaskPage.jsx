@@ -72,9 +72,9 @@ const TaskPage = () => {
   }, [activeRider, navigate]);
 
   // ดึงรายการงานจาก MySQL API
-  const loadOrdersFromApi = async () => {
+    const loadOrdersFromApi = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const data = await fetchOrders();
       if (setOrders) {
         setOrders(data);
@@ -82,14 +82,18 @@ const TaskPage = () => {
       cacheOrders(data)
     } catch (err) {
       console.error('Error fetching orders:', err);
-      triggerToast('โหลดข้อมูลงานไม่สำเร็จ', 'error');
+      if (!silent) triggerToast('โหลดข้อมูลงานไม่สำเร็จ', 'error');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
     loadOrdersFromApi();
+    const timer = setInterval(() => {
+      if (!document.hidden) loadOrdersFromApi(true);
+    }, 15000);
+    return () => clearInterval(timer);
   }, []);
 
   const [activeTab, setActiveTab] = useState('active'); // 'active' | 'return' | 'history'
@@ -115,6 +119,7 @@ const TaskPage = () => {
       onConfirm: () => {
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
         localStorage.removeItem('currentRider');
+        localStorage.removeItem('token');
         setActiveRider(null);
         navigate('/login/rider', { replace: true });
       }

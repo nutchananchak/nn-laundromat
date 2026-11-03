@@ -45,8 +45,11 @@ export default function OrdersPage() {
         console.error('Failed to sync orders in OrdersPage:', err);
       }
     };
-
-    loadLiveOrders();
+        loadLiveOrders();
+    const timer = setInterval(() => {
+      if (!document.hidden) loadLiveOrders();
+    }, 15000);
+    return () => clearInterval(timer);
   }, [setOrders]);
 
   // แยก Order ตาม User ปัจจุบัน

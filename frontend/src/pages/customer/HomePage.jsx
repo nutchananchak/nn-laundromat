@@ -97,8 +97,11 @@ export default function HomePage() {
         console.error('Failed to sync orders from MySQL:', err);
       }
     };
-
-    loadRealtimeOrders();
+        loadRealtimeOrders();
+    const timer = setInterval(() => {
+      if (!document.hidden) loadRealtimeOrders();
+    }, 15000);
+    return () => clearInterval(timer);
   }, []);
 
   // 2. ดึงสถานะร้าน วันหยุด และเช็กสถานะการแจ้งเตือน

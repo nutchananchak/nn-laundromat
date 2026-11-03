@@ -1021,6 +1021,7 @@ const DashboardPage = () => {
       'bg-red-600',
       () => {
         localStorage.removeItem('currentAdmin');
+        localStorage.removeItem('token');
         navigate('/login/admin', { replace: true });
       }
     );

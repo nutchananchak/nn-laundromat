@@ -22,14 +22,25 @@ const getNextRunningOrderId = async (connection) => {
 // 1. ดึงรายการออเดอร์ทั้งหมด
 export const getOrders = async (req, res) => {
   try {
-    const { userId } = req.query;
+        const { userId } = req.query;
 
     const params = [];
-    let whereSql = '';
-    if (userId) {
-      whereSql = 'WHERE o.customer_phone = ?';
+    const conditions = [];
+
+    if (req.user.role === 'customer') {
+      // ลูกค้าเห็นเฉพาะออเดอร์ของตัวเอง ไม่ว่าหน้าเว็บจะขออะไรมา
+      conditions.push('o.customer_phone = ?');
+      params.push(req.user.phone);
+    } else if (req.user.role === 'rider') {
+      // ไรเดอร์เห็นเฉพาะงานที่มอบหมายให้ตัวเอง
+      conditions.push('(o.pickup_rider_id = ? OR o.delivery_rider_id = ?)');
+      params.push(req.user.id, req.user.id);
+    } else if (userId) {
+      conditions.push('o.customer_phone = ?');
       params.push(userId);
     }
+
+    const whereSql = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
     const [rows] = await pool.query(`
       SELECT
@@ -139,7 +150,7 @@ export const getOrders = async (req, res) => {
         deliveryTime: row.deliveryTime,
         note: row.note || '',
         plasticBagCount: Number(row.plasticBagCount || 0),
-        slipImage: row.slipImage,
+        slipImage: req.user.role === 'rider' ? null : row.slipImage,
         proofImage,
         riderPickupImage,
         riderBasketImage: riderPickupImage,
@@ -177,31 +188,27 @@ export const createOrder = async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    const data = req.body;
-        data.slipImage = await uploadImage(data.slipImage, 'slips');
-        data.customerBasketImage = await uploadImage(
-        data.customerBasketImage || data.basketImage || data.riderBasketImage || null,
-        'basket'
+        const data = req.body;
+
+    // ใช้ข้อมูลจากบัญชีที่ล็อกอิน ไม่เชื่อชื่อ/เบอร์ที่หน้าเว็บส่งมา และไม่สร้างลูกค้าอัตโนมัติอีก
+    const [me] = await connection.query(
+      'SELECT customer_id, name, phone_number FROM Customer WHERE customer_id = ?',
+      [req.user.id]
+    );
+    if (me.length === 0) {
+      await connection.rollback();
+      return res.status(401).json({ message: 'ไม่พบบัญชีผู้ใช้ กรุณาเข้าสู่ระบบใหม่' });
+    }
+    const customerId = me[0].customer_id;
+    const cleanPhone = me[0].phone_number;
+    data.customerName = data.customerName || me[0].name;
+
+    data.slipImage = await uploadImage(data.slipImage, 'slips');
+    data.customerBasketImage = await uploadImage(
+      data.customerBasketImage || data.basketImage || data.riderBasketImage || null,
+      'basket'
     );
     const orderId = await getNextRunningOrderId(connection);
-    const cleanPhone = String(data.customerPhone || '0800000000').replace(/\D/g, '');
-
-    // 1. ตรวจสอบหรือสร้าง Customer
-    const [existingCustomers] = await connection.query(
-      'SELECT customer_id FROM Customer WHERE phone_number = ?',
-      [cleanPhone]
-    );
-
-    let customerId;
-    if (existingCustomers.length > 0) {
-      customerId = existingCustomers[0].customer_id;
-    } else {
-      const [newCustomer] = await connection.query(
-        'INSERT INTO Customer (name, phone_number, password, address) VALUES (?, ?, ?, ?)',
-        [data.customerName || 'คุณลูกค้า', cleanPhone, 'User1234', data.address || '']
-      );
-      customerId = newCustomer.insertId;
-    }
 
     // 2. ตรวจสอบ Service_Type
     const [services] = await connection.query(
@@ -245,9 +252,9 @@ export const createOrder = async (req, res) => {
       Number(data.plasticBagCount || 0),
       data.note || '',
       null, // rider_basket_image ยังเป็น null รอไรเดอร์ถ่าย
-      data.status || 'pending',
-      Number(data.statusStep || 1),
-      data.statusTitle || 'รอตรวจสอบสลิป',
+      'pending',
+      1,
+      'รอตรวจสอบสลิป',
       'pending',
       false,
       false,
@@ -322,6 +329,67 @@ export const createOrder = async (req, res) => {
   }
 };
 
+const RIDER_KEYS = ['statusStep', 'statusTitle', 'status', 'deliveredAt',
+  'riderPickupImage', 'riderBasketImage', 'proofImage', 'riderDeliveryImage'];
+
+const authorizeOrderUpdate = async (connection, user, id, rawBody) => {
+  const [rows] = await connection.query(
+    'SELECT customer_phone, status_step, payment_rejected, pickup_rider_id, delivery_rider_id FROM `Order` WHERE order_id = ? FOR UPDATE',
+    [id]
+  );
+  if (rows.length === 0) return { status: 404, error: 'ไม่พบออเดอร์' };
+  const o = rows[0];
+  const body = rawBody || {};
+
+  // แอดมิน: ทำได้ทุกอย่าง
+  if (user.role === 'admin') return { body };
+
+  // ไรเดอร์: แก้ได้เฉพาะงานของตัวเอง และเฉพาะความคืบหน้างาน/รูปหลักฐาน
+  if (user.role === 'rider') {
+    if (o.pickup_rider_id !== user.id && o.delivery_rider_id !== user.id) {
+      return { status: 403, error: 'ออเดอร์นี้ไม่ได้มอบหมายให้คุณ' };
+    }
+    const clean = {};
+    RIDER_KEYS.forEach((k) => { if (body[k] !== undefined) clean[k] = body[k]; });
+    if (clean.statusStep !== undefined) {
+      const step = Number(clean.statusStep);
+      if (!(step >= 4 && step <= 7)) return { status: 403, error: 'ไม่สามารถเปลี่ยนสถานะนี้ได้' };
+    }
+    if (clean.status !== undefined && !['in_progress', 'completed'].includes(clean.status)) {
+      return { status: 403, error: 'ไม่สามารถเปลี่ยนสถานะนี้ได้' };
+    }
+    return { body: clean };
+  }
+
+  // ลูกค้า: ได้แค่ "ยกเลิกก่อนไรเดอร์รับ" หรือ "ส่งสลิปใหม่เมื่อสลิปไม่ผ่าน" เฉพาะออเดอร์ตัวเอง
+  if (o.customer_phone !== user.phone) return { status: 403, error: 'ไม่ใช่ออเดอร์ของคุณ' };
+
+  if (body.status === 'cancelled') {
+    if (Number(o.status_step) >= 3) return { status: 409, error: 'ออเดอร์นี้ไม่สามารถยกเลิกได้แล้ว' };
+    return { body: {
+      status: 'cancelled',
+      statusTitle: body.statusTitle,
+      cancelReason: body.cancelReason,
+      cancelledAt: body.cancelledAt,
+    } };
+  }
+
+  if (body.slipImage) {
+    if (!o.payment_rejected) return { status: 409, error: 'ออเดอร์นี้ไม่ได้อยู่ในสถานะให้ส่งสลิปใหม่' };
+    return { body: {
+      slipImage: body.slipImage,
+      paymentVerified: false,
+      paymentRejected: false,
+      rejectReason: null,
+      statusStep: 1,
+      statusTitle: 'ตรวจสอบยอดเงิน (ส่งสลิปใหม่แล้ว)',
+      status: 'pending',
+    } };
+  }
+
+  return { status: 403, error: 'ไม่มีสิทธิ์ทำรายการนี้' };
+};
+
 // 3. อัปเดตสถานะออเดอร์
 export const updateOrderStatus = async (req, res) => {
   const connection = await pool.getConnection();
@@ -329,7 +397,12 @@ export const updateOrderStatus = async (req, res) => {
     await connection.beginTransaction();
 
     const { id } = req.params;
-    const body = req.body;
+    const guard = await authorizeOrderUpdate(connection, req.user, id, req.body);
+    if (guard.error) {
+      await connection.rollback();
+      return res.status(guard.status).json({ message: guard.error });
+    }
+    const body = guard.body;
         body.slipImage = await uploadImage(body.slipImage, 'slips');
         body.riderPickupImage = await uploadImage(body.riderPickupImage, 'pickup');
         body.riderBasketImage = await uploadImage(body.riderBasketImage, 'pickup');

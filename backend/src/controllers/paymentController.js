@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import generatePayload from 'promptpay-qr';
 import qrcode from 'qrcode';
 import axios from 'axios';
+import { signToken } from '../middleware/auth.js';
 
 // โหลด Environment Variables
 const __filename = fileURLToPath(import.meta.url);
@@ -62,11 +63,19 @@ export const sendServerOtp = async (req, res) => {
       return res.status(400).json({ message: 'กรุณาระบุเบอร์โทรศัพท์ที่ถูกต้อง' });
     }
 
-    // สุ่มรหัส OTP 6 หลัก และตั้งเวลาหมดอายุ 5 นาที
-    const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = Date.now() + 5 * 60 * 1000;
+    // กันกดขอซ้ำรัวๆ (กัน SMS เปลืองเงิน)
+    const existing = otpStore.get(cleanPhone);
+    if (existing && Date.now() - existing.sentAt < 60 * 1000) {
+      return res.status(429).json({ message: 'ขอรหัสได้ทุก 60 วินาที กรุณารอสักครู่' });
+    }
 
-    otpStore.set(cleanPhone, { code: generatedOtp, expiresAt });
+    const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    otpStore.set(cleanPhone, {
+      code: generatedOtp,
+      expiresAt: Date.now() + 5 * 60 * 1000,
+      sentAt: Date.now(),
+      attempts: 0,
+    });
 
     const apiKey = (process.env.THAIBULKSMS_API_KEY || '').trim();
     const apiSecret = (process.env.THAIBULKSMS_API_SECRET || '').trim();
@@ -80,7 +89,7 @@ export const sendServerOtp = async (req, res) => {
       };
 
       await axios.post('https://api-v2.thaibulksms.com/sms', smsPayload, {
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
           'Authorization': `Basic ${authHeader}`
@@ -96,7 +105,7 @@ export const sendServerOtp = async (req, res) => {
     });
   } catch (error) {
     console.error('Error sending SMS OTP:', error.response?.data || error.message);
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'เกิดข้อผิดพลาดในการส่งข้อความ SMS',
       detail: error.response?.data?.error?.message || error.message
     });
@@ -124,16 +133,22 @@ export const verifyServerOtp = async (req, res) => {
       return res.status(400).json({ message: 'รหัส OTP หมดอายุแล้ว กรุณากดขอรหัสใหม่' });
     }
 
+    if (record.attempts >= 5) {
+      otpStore.delete(cleanPhone);
+      return res.status(429).json({ message: 'กรอกรหัสผิดเกินกำหนด กรุณาขอรหัสใหม่' });
+    }
+
     if (record.code !== String(otp).trim()) {
+      record.attempts += 1;
       return res.status(400).json({ message: 'รหัส OTP ไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง' });
     }
 
-    // เมื่อยืนยันถูกต้อง ให้ลบออกจาก Memory เพื่อป้องกันการใช้ซ้ำ
     otpStore.delete(cleanPhone);
 
     res.status(200).json({
       success: true,
-      message: 'ยืนยันรหัส OTP ถูกต้องเรียบร้อย'
+      message: 'ยืนยันรหัส OTP ถูกต้องเรียบร้อย',
+      reset_token: signToken({ purpose: 'reset', phone: cleanPhone }, '10m')
     });
   } catch (error) {
     console.error('Error verifying OTP:', error);

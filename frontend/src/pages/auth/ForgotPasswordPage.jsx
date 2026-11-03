@@ -166,9 +166,10 @@ export default function ForgotPasswordPage() {
       setIsVerifyingOtp(true);
       const cleanPhone = phoneNumber.replace(/[^0-9]/g, '');
       const res = await verifyOtpApi(cleanPhone, cleanOtp);
-      if (res.success) {
-        setStep(3);
-      }
+        if (res.success) {
+          setResetToken(res.reset_token || '');
+          setStep(3);
+        }
     } catch (err) {
       setErrorMsg(err.response?.data?.message || 'รหัส OTP ไม่ถูกต้องหรือหมดอายุแล้ว');
     } finally {
@@ -194,7 +195,7 @@ export default function ForgotPasswordPage() {
     const cleanPhone = phoneNumber.replace(/[^0-9]/g, '');
 
     try {
-      await forgotPasswordApi(cleanPhone, newPassword, 'customer');
+      await forgotPasswordApi(cleanPhone, newPassword, 'customer', resetToken);
       setIsSuccessOpen(true);
     } catch (err) {
       setErrorMsg(err.response?.data?.message || 'ไม่พบบัญชีผู้ใช้ที่ลงทะเบียนด้วยเบอร์นี้');
