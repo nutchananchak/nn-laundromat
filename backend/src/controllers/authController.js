@@ -3,6 +3,28 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import pool from '../config/db.js';
 import axios from 'axios';
+import bcrypt from 'bcryptjs';
+
+const isHashed = (s) => /^\$2[aby]\$\d{2}\$/.test(String(s || ''));
+
+// ตรวจรหัสผ่าน รองรับทั้งที่เข้ารหัสแล้วและบัญชีเก่าที่ยังเป็นข้อความธรรมดา
+const verifyPassword = async (plain, stored) => {
+  const s = String(stored || '').trim();
+  if (isHashed(s)) return bcrypt.compare(plain, s);
+  return s === plain;
+};
+
+const hashPassword = (plain) => bcrypt.hash(plain, 10);
+
+// แปลงรหัสเก่าเป็นแบบเข้ารหัส หลังล็อกอินสำเร็จ (table และ column มาจากค่าคงที่ในโค้ด ไม่ใช่ข้อมูลผู้ใช้)
+const upgradeIfPlain = async (table, idColumn, id, stored, plain) => {
+  if (isHashed(stored)) return;
+  try {
+    await pool.query(`UPDATE ${table} SET password = ? WHERE ${idColumn} = ?`, [await hashPassword(plain), id]);
+  } catch (e) {
+    console.warn('upgrade password hash failed:', e.message);
+  }
+};
 
 // บังคับโหลดไฟล์ .env จากระดับโฟลเดอร์ backend
 const __filename = fileURLToPath(import.meta.url);

@@ -1,2 +1,4 @@
 .env
-node_modules/import-db.js
+node_modules/
+import-db.js
+migrate-images-to-cloudinary.js
