@@ -1625,7 +1625,7 @@ const DashboardPage = () => {
             </div>
           )}
 
-          {/* ======================= แท็บ 2: ออเดอร์กำลังดำเนินการ ======================= */}
+                    {/* ======================= แท็บ 2: ออเดอร์กำลังดำเนินการ ======================= */}
           {activeTab === 'in_progress' && (
             <div className="space-y-6">
               <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden p-6">
@@ -1650,12 +1650,13 @@ const DashboardPage = () => {
                   </div>
                 ) : (
                   <div className="w-full overflow-x-auto">
-                    <table className="w-full text-left text-sm border-collapse min-w-[1050px]">
+                    <table className="w-full text-left text-sm border-collapse min-w-[1200px]">
                       <thead>
                         <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold text-xs uppercase tracking-wider">
                           <th className="py-4 px-5">เลขออเดอร์</th>
                           <th className="py-4 px-4">ลูกค้า</th>
                           <th className="py-4 px-4">บริการ</th>
+                          <th className="py-4 px-4">เวลารับ-ส่ง</th>
                           <th className="py-4 px-4">สถานะการทำงาน</th>
                           <th className="py-4 px-4">ไรเดอร์ผู้ดูแล</th>
                           <th className="py-4 px-4">ยอดเงิน</th>
@@ -1664,7 +1665,10 @@ const DashboardPage = () => {
                       </thead>
                       <tbody className="divide-y divide-slate-100 bg-white">
                         {inProgressOrders.map(order => {
-                          const isWashingStep = Number(order.statusStep) === 5;
+                          const stepNo = Number(order.statusStep);
+                          const isWashingStep = stepNo === 5;
+                          const isPickupPhase = stepNo <= 3;
+                          const isDeliveryPhase = stepNo >= 6;
 
                           return (
                             <tr key={order.id} className="hover:bg-slate-50/60 transition">
@@ -1676,6 +1680,24 @@ const DashboardPage = () => {
                               <td className="py-4 px-4">
                                 <span className="font-semibold text-slate-800 block">{order.serviceName}</span>
                                 {order.packageName && <span className="text-xs text-slate-400">{order.packageName}</span>}
+                              </td>
+                              <td className="py-4 px-4 align-middle text-left whitespace-nowrap">
+                                <div className="space-y-1">
+                                  <div className={`flex items-center gap-1.5 text-xs ${isPickupPhase ? 'text-blue-700' : 'text-slate-700'}`}>
+                                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"></span>
+                                    <span className="text-slate-400 font-medium">รับ:</span>
+                                    <span className={isPickupPhase ? 'font-extrabold' : 'font-bold text-slate-800'}>
+                                      {order.pickupTime || 'ไม่ระบุ'}
+                                    </span>
+                                  </div>
+                                  <div className={`flex items-center gap-1.5 text-xs ${isDeliveryPhase ? 'text-emerald-700' : 'text-slate-700'}`}>
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                                    <span className="text-slate-400 font-medium">ส่ง:</span>
+                                    <span className={isDeliveryPhase ? 'font-extrabold' : 'font-bold text-slate-800'}>
+                                      {order.deliveryTime || 'ไม่ระบุ'}
+                                    </span>
+                                  </div>
+                                </div>
                               </td>
                               <td className="py-4 px-4">
                                 <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${

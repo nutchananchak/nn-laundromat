@@ -6,21 +6,36 @@ import { useApp } from '../../context/AppContext';
 export default function BottomNav() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { orders } = useApp ? useApp() : {};
-
+  const { orders, userProfile } = useApp ? useApp() : {};
+  const currentUserId = String(userProfile?.phone || userProfile?.id || '').trim();
   const [hasAlert, setHasAlert] = useState(false);
 
   useEffect(() => {
-    const hasRejectedOrder = (orders || []).some(o => o.paymentRejected === true);
-    let hasUnread = false;
-    try {
-      const savedNotices = JSON.parse(localStorage.getItem('customerNotifications') || '[]');
-      hasUnread = savedNotices.some(n => n.isRead === false);
-    } catch (e) {
-      hasUnread = false;
-    }
-    setHasAlert(hasRejectedOrder || hasUnread);
-  }, [orders, location.pathname]);
+  if (!currentUserId) {
+    setHasAlert(false);
+    return;
+  }
+
+  const isMine = (v) => String(v || '').trim() === currentUserId;
+
+  const hasRejectedOrder = (orders || []).some(o =>
+    o.paymentRejected === true &&
+    isMine(o.customerPhone || o.userPhone || o.userId || o.customerId)
+  );
+
+  let hasUnread = false;
+  try {
+    const saved = JSON.parse(localStorage.getItem('customerNotifications') || '[]');
+    hasUnread = saved.some(n =>
+      n.isRead === false &&
+      (isMine(n.userId || n.customerPhone) || (!n.userId && !n.customerPhone && !n.orderId))
+    );
+  } catch (e) {
+    hasUnread = false;
+  }
+
+  setHasAlert(hasRejectedOrder || hasUnread);
+}, [orders, location.pathname, currentUserId]);
 
   const menus = [
     { 
