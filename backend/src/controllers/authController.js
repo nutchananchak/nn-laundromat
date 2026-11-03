@@ -65,7 +65,8 @@ export const login = async (req, res) => {
         return res.status(404).json({ message: 'ไม่พบบัญชีผู้ดูแลระบบนี้ในระบบ' });
       }
 
-      if (String(admins[0].password).trim() !== cleanPassword) {
+      if (!(await verifyPassword(cleanPassword, admins[0].password))) {
+        await upgradeIfPlain('Admin', 'admin_id', admins[0].id, admins[0].password, cleanPassword);
         return res.status(401).json({ message: 'รหัสผ่านผู้ดูแลระบบไม่ถูกต้อง' });
       }
 
@@ -96,7 +97,8 @@ export const login = async (req, res) => {
         return res.status(404).json({ message: 'ไม่พบบัญชีไรเดอร์นี้ในระบบ' });
       }
 
-      if (String(riders[0].password).trim() !== cleanPassword) {
+      if (!(await verifyPassword(cleanPassword, riders[0].password))) {
+        await upgradeIfPlain('Rider', 'rider_id', riders[0].id, riders[0].password, cleanPassword);
         return res.status(401).json({ message: 'รหัสผ่านไรเดอร์ไม่ถูกต้อง' });
       }
 
@@ -125,7 +127,8 @@ export const login = async (req, res) => {
 
     const customer = customers[0];
 
-    if (String(customer.password).trim() !== cleanPassword) {
+    if (!(await verifyPassword(cleanPassword, customer.password))) {
+      await upgradeIfPlain('Customer', 'customer_id', customer.id, customer.password, cleanPassword);
       return res.status(401).json({ 
         message: 'รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง' 
       });
@@ -174,7 +177,7 @@ export const register = async (req, res) => {
 
     const [result] = await pool.query(
       'INSERT INTO Customer (name, phone_number, password, address) VALUES (?, ?, ?, ?)',
-      [cleanName, cleanPhone, cleanPassword, cleanAddress]
+      [cleanName, cleanPhone, await hashPassword(cleanPassword), cleanAddress]
     );
 
     res.status(201).json({
@@ -211,7 +214,7 @@ export const forgotPassword = async (req, res) => {
 
     const [result] = await pool.query(
       `UPDATE ${table} SET password = ? WHERE phone_number = ? OR phone_number = ?`,
-      [cleanNewPassword, rawPhone, cleanPhone]
+      [await hashPassword(cleanNewPassword), rawPhone, cleanPhone]
     );
 
     if (result.affectedRows === 0) {
