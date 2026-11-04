@@ -18,6 +18,7 @@ import BottomNav from '../../components/layout/BottomNav';
 import { useApp } from '../../context/AppContext';
 import { fetchOrders } from '../../api/order';
 import { cacheOrders } from '../../utils/orderCache';
+import { fetchSettings } from '../../api/settings';
 
 export default function NotificationPage() {
   const navigate = useNavigate();
@@ -145,8 +146,11 @@ export default function NotificationPage() {
       }
 
       // ประกาศร้านปิดฉุกเฉิน
-      const savedStoreStatus = localStorage.getItem('storeServiceStatus');
-      const isStoreClosedByAdmin = savedStoreStatus !== null && JSON.parse(savedStoreStatus) === false;
+      let isStoreClosedByAdmin = false;
+         try {
+           const s = await fetchSettings();
+           isStoreClosedByAdmin = s.storeOpen === false;
+         } catch (e) {}
 
       if (isStoreClosedByAdmin && !newNotices.some(n => n.uniqueKey === 'emergency_store_closed')) {
         newNotices.unshift({
