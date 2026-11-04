@@ -80,7 +80,7 @@ export const login = async (req, res) => {
           name: admin.name, 
           role: 'admin' 
         },
-        token: `signToken({ role: 'admin', id: admin.id }, '1d')`
+        token: signToken({ role: 'admin', id: admin.id }, '1d')
       });
     }
 
@@ -107,7 +107,7 @@ export const login = async (req, res) => {
       return res.status(200).json({
         success: true,
         user: { id: rider.id, name: rider.name, phone: rider.phone_number, role: 'rider' },
-        token: `signToken({ role: 'rider', id: rider.id }, '2d')`
+        token: signToken({ role: 'rider', id: rider.id }, '2d')
       });
     }
 
@@ -144,7 +144,7 @@ export const login = async (req, res) => {
         address: customer.address,
         role: 'customer'
       },
-      token: `signToken({ role: 'customer', id: customer.id, phone: customer.phone_number })`
+      token: signToken({ role: 'customer', id: customer.id, phone: customer.phone_number })
     });
   } catch (error) {
     console.error('Error during login:', error);
@@ -191,7 +191,7 @@ export const register = async (req, res) => {
         address: cleanAddress, 
         role: 'customer' 
       },
-      token: `signToken({ role: 'customer', id: result.insertId, phone: cleanPhone })`
+      token: signToken({ role: 'customer', id: result.insertId, phone: cleanPhone })
     });
   } catch (error) {
     console.error('Error during register:', error);
