@@ -174,8 +174,12 @@ const DashboardPage = () => {
     }
   };
 
-  useEffect(() => {
+    useEffect(() => {
     loadOrdersFromApi();
+    const timer = setInterval(() => {
+      if (!document.hidden) loadOrdersFromApi();
+    }, 15000);
+    return () => clearInterval(timer);
   }, []);
 
   const [lastSeenCounts, setLastSeenCounts] = useState(() => {
@@ -503,9 +507,8 @@ const DashboardPage = () => {
     }
   });
 
-  // แยก State เดือนและปีของปฏิทินร้านออกจากกันแบบตรงไปตรงมา ป้องกันปัญหา Timezone Offset 100%
-  const [calendarYear, setCalendarYear] = useState(2026);
-  const [calendarMonth, setCalendarMonth] = useState(9); // ค่าเริ่มต้น: เดือนตุลาคม (index 9)
+ const [calendarYear, setCalendarYear] = useState(() => new Date().getFullYear());
+ const [calendarMonth, setCalendarMonth] = useState(() => new Date().getMonth());
 
   const [closedDates, setClosedDates] = useState(() => {
     try {
@@ -2888,8 +2891,10 @@ const DashboardPage = () => {
                           onChange={(e) => setCalendarYear(Number(e.target.value))}
                           className="appearance-none bg-white border border-slate-200 hover:border-[#1d61f2] focus:border-[#1d61f2] rounded-2xl pl-3.5 pr-8 py-2 text-xs font-bold text-slate-700 outline-none cursor-pointer transition shadow-2xs"
                         >
-                          <option value={2026}>พ.ศ. 2569</option>
-                          <option value={2027}>ปี พ.ศ. 2570</option>
+                          {[0, 1, 2].map((offset) => {
+                            const y = new Date().getFullYear() + offset;
+                            return <option key={y} value={y}>พ.ศ. {y + 543}</option>;
+                          })}
                         </select>
                         <ChevronDown size={14} className="text-slate-400 absolute right-2.5 pointer-events-none" />
                       </div>
@@ -2918,7 +2923,10 @@ const DashboardPage = () => {
                         }
 
                         const isClosed = closedDates.includes(item.dateStr);
-                        const isSelectedToday = item.dateStr === new Date().toISOString().split('T')[0];
+                        const isSelectedToday = item.dateStr === (() => {
+                        const t = new Date();
+                        return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+                      })();
 
                         return (
                           <button

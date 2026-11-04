@@ -219,12 +219,15 @@ export default function HomePage() {
     return () => clearInterval(timer);
   }, [hasOngoingOrder, totalBanners]);
 
+  const toLocalDateStr = (d) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
   const today = new Date();
-  const todayStr = today.toISOString().split('T')[0];
+  const todayStr = toLocalDateStr(today);
 
   const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowStr = tomorrow.toISOString().split('T')[0];
+    tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = toLocalDateStr(tomorrow);
 
   const isTodayClosed = closedDates.includes(todayStr);
   const isTomorrowClosed = closedDates.includes(tomorrowStr);
