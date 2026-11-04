@@ -84,7 +84,7 @@ export default function HomePage() {
       try {
         const liveOrders = await fetchOrders();
         const savedViewedIds = JSON.parse(localStorage.getItem('viewed_completed_orders') || '[]');
-        
+
         const mergedOrders = (liveOrders || []).map(order => ({
           ...order,
           viewedCompleted: savedViewedIds.includes(String(order.id)) || Boolean(order.viewedCompleted)
@@ -120,8 +120,10 @@ export default function HomePage() {
      }, 30000);
      return () => clearInterval(timer);
    }, []);
-    
 
+
+  // ตรวจสอบการแจ้งเตือนที่ยังไม่ได้อ่าน
+  useEffect(() => {
     const checkUnreadNotices = () => {
       if (!currentUserId) {
         setHasUnreadNotices(false);
@@ -136,7 +138,9 @@ export default function HomePage() {
           return isSystemAnnouncement || owner === currentUserId;
         });
 
-        const unreadExists = myNotices.some(n => n.isRead === false || n.isRead === 'false' || !n.isRead);
+        const unreadExists = myNotices.some(
+          n => n.isRead === false || n.isRead === 'false' || !n.isRead
+        );
         setHasUnreadNotices(unreadExists);
       } catch (e) {
         setHasUnreadNotices(false);
@@ -152,7 +156,7 @@ export default function HomePage() {
       window.removeEventListener('storage', checkUnreadNotices);
       window.removeEventListener('focus', checkUnreadNotices);
     };
-  }; [currentUserId];
+  }, [currentUserId]);
 
   const getThaiTimestamp = () => {
     const now = new Date();
@@ -295,7 +299,6 @@ export default function HomePage() {
         cancelReason: cancelReason,
         cancelledAt: cancelTimestamp
       });
-
       if (setOrders) {
         setOrders(prev => prev.map(o => {
           if (o.id === activeOrder.id) {
@@ -454,7 +457,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* 2. Scrollable Content Body (ปรับ padding pb-28 และ px-6 py-5 ให้เท่ากับ ProfilePage เป๊ะ) */}
+        {/* 2. Scrollable Content Body */}
         <div className="flex-1 overflow-y-auto px-6 py-5 pb-28 flex flex-col gap-4">
 
           {/* ป้ายแจ้งเตือนสลิปไม่ผ่าน */}
@@ -581,7 +584,7 @@ export default function HomePage() {
                       </h3>
                       <ChevronRight size={18} className="text-blue-400 group-hover:text-[#1045b8] transition" />
                     </div>
-                    
+
                     <span className="text-xs text-slate-500 block mt-1 font-medium">
                       {Number(activeOrder.statusStep) >= 7
                         ? 'แตะที่นี่เพื่อตรวจสอบใบเสร็จและรายละเอียดออเดอร์'
@@ -597,8 +600,7 @@ export default function HomePage() {
                         style={{ width: `${((Math.min(activeOrder.statusStep, 7) - 1) / (steps.length - 1)) * 100}%` }}
                       />
                     </div>
-
-                    {steps.map((item) => {
+                                        {steps.map((item) => {
                       const Icon = item.icon;
                       const isPassed = item.step <= activeOrder.statusStep;
                       const isCurrent = item.step === activeOrder.statusStep;
@@ -659,7 +661,7 @@ export default function HomePage() {
           ) : (
             /* Smart Banner */
             <div className="bg-white p-4.5 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between min-h-[195px] transition-all">
-              
+
               {/* สไลด์ 0: การ์ดสะสมแต้ม */}
               {hasHistory && bannerIndex === 0 && (
                 <div className="w-full flex flex-col justify-between h-full animate-in fade-in duration-300">
@@ -859,7 +861,7 @@ export default function HomePage() {
           {/* เลือกแพ็กเกจบริการ */}
           <div>
             <span className="font-bold text-base text-slate-800 block mb-3">เลือกแพ็กเกจบริการ</span>
-            
+
             <div className="grid grid-cols-2 gap-3.5">
               <div
                 onClick={() => setSelectedService('wash_dry_fold')}
@@ -895,7 +897,7 @@ export default function HomePage() {
                 }`}>
                   <BedDouble size={26} />
                 </div>
-                <span className="font-bold text-sm text-slate-900">ชุดเครื่องนอน/แยกชิ้น</span>
+                                <span className="font-bold text-sm text-slate-900">ชุดเครื่องนอน/แยกชิ้น</span>
                 <span className="text-xs font-semibold text-slate-500 mt-1">เริ่มต้น 10฿</span>
               </div>
             </div>
@@ -1059,3 +1061,4 @@ export default function HomePage() {
       </div>
     </div>
   );
+}
