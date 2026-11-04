@@ -41,6 +41,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { fetchOrders, updateOrder } from '../../api/order';
+import { fetchSettings, saveSettings, fetchRidersApi, createRiderApi, updateRiderApi, deleteRiderApi } from '../../api/settings';
 
 // โลโก้ร้าน N&N Laundromat
 const BrandLogo = ({ size = 48 }) => (
@@ -345,58 +346,63 @@ const DashboardPage = () => {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
-  // จัดการไรเดอร์
-  const [riderList, setRiderList] = useState(() => {
-    try {
-      const saved = localStorage.getItem('storeRiders');
-      return saved ? JSON.parse(saved) : [
-        { id: 'RD-01', name: 'วรรณา สีดา', phone: '094-285-5891', status: 'active' },
-        { id: 'RD-02', name: 'วันดี ทองอ่อน', phone: '083-188-7742', status: 'active' },
-        { id: 'RD-03', name: 'สตาร์ วินเพียว', phone: '084-078-8915', status: 'inactive' },
-      ];
-    } catch (e) {
-      return [];
-    }
-  });
+    // จัดการไรเดอร์ (เก็บในฐานข้อมูลกลาง)
+  const [riderList, setRiderList] = useState([]);
 
-  const saveRiders = (updated) => {
-    setRiderList(updated);
+  const loadRiders = async () => {
     try {
-      localStorage.setItem('storeRiders', JSON.stringify(updated));
-    } catch (e) {}
+      setRiderList(await fetchRidersApi());
+    } catch (e) {
+      console.error('Failed to load riders:', e);
+    }
   };
 
-  const [newRiderForm, setNewRiderForm] = useState({ name: '', phone: '' });
+  const [newRiderForm, setNewRiderForm] = useState({ name: '', phone: '', password: '' });
   const [showAddRiderModal, setShowAddRiderModal] = useState(false);
 
-  const handleAddRider = (e) => {
+  const handleAddRider = async (e) => {
     e.preventDefault();
-    if (!newRiderForm.name.trim() || !newRiderForm.phone.trim()) {
-      triggerToast('กรุณากรอกข้อมูลไรเดอร์ให้ครบถ้วน', 'error');
+    if (!newRiderForm.name.trim() || !newRiderForm.phone.trim() || newRiderForm.password.length < 6) {
+      triggerToast('กรุณากรอกข้อมูลให้ครบ และรหัสผ่านอย่างน้อย 6 ตัวอักษร', 'error');
       return;
     }
-    const nextId = `RD-${String(riderList.length + 1).padStart(2, '0')}`;
-    const updated = [...riderList, { id: nextId, name: newRiderForm.name.trim(), phone: newRiderForm.phone.trim(), status: 'active' }];
-    saveRiders(updated);
-    setNewRiderForm({ name: '', phone: '' });
-    setShowAddRiderModal(false);
-    triggerToast(`เพิ่มไรเดอร์ ${newRiderForm.name} เรียบร้อยแล้ว`);
+    try {
+      await createRiderApi({
+        name: newRiderForm.name.trim(),
+        phone: newRiderForm.phone.trim(),
+        password: newRiderForm.password,
+      });
+      await loadRiders();
+      triggerToast(`เพิ่มไรเดอร์ ${newRiderForm.name} เรียบร้อยแล้ว`);
+      setNewRiderForm({ name: '', phone: '', password: '' });
+      setShowAddRiderModal(false);
+    } catch (err) {
+      triggerToast(err.response?.data?.message || 'เพิ่มไรเดอร์ไม่สำเร็จ', 'error');
+    }
   };
 
-  const handleToggleRiderStatus = (riderId) => {
+  const handleToggleRiderStatus = async (riderId) => {
     const target = riderList.find(r => r.id === riderId);
     if (!target) return;
     const newStatus = target.status === 'active' ? 'inactive' : 'active';
-    const updated = riderList.map(r => r.id === riderId ? { ...r, status: newStatus } : r);
-    saveRiders(updated);
-    triggerToast(`เปลี่ยนสถานะของ ${target.name} เป็น "${newStatus === 'active' ? 'พร้อมวิ่งงาน' : 'พักงานชั่วคราว'}" แล้ว`, newStatus === 'active' ? 'success' : 'info');
+    try {
+      await updateRiderApi(riderId, { status: newStatus });
+      await loadRiders();
+      triggerToast(`เปลี่ยนสถานะของ ${target.name} เป็น "${newStatus === 'active' ? 'พร้อมวิ่งงาน' : 'พักงานชั่วคราว'}" แล้ว`, newStatus === 'active' ? 'success' : 'info');
+    } catch (err) {
+      triggerToast(err.response?.data?.message || 'เปลี่ยนสถานะไม่สำเร็จ', 'error');
+    }
   };
 
   const handleDeleteRider = (riderId) => {
-    openConfirm('ยืนยันการลบไรเดอร์', 'คุณต้องการลบไรเดอร์ท่านนี้ออกจากระบบใช่หรือไม่?', 'ลบข้อมูล', 'bg-red-600', () => {
-      const updated = riderList.filter(r => r.id !== riderId);
-      saveRiders(updated);
-      triggerToast('ลบข้อมูลไรเดอร์เรียบร้อยแล้ว');
+    openConfirm('ยืนยันการลบไรเดอร์', 'คุณต้องการลบไรเดอร์ท่านนี้ออกจากระบบใช่หรือไม่?', 'ลบข้อมูล', 'bg-red-600', async () => {
+      try {
+        await deleteRiderApi(riderId);
+        await loadRiders();
+        triggerToast('ลบข้อมูลไรเดอร์เรียบร้อยแล้ว');
+      } catch (err) {
+        triggerToast(err.response?.data?.message || 'ลบไรเดอร์ไม่สำเร็จ', 'error');
+      }
       setConfirmModal(prev => ({ ...prev, isOpen: false }));
     });
   };
@@ -466,14 +472,7 @@ const DashboardPage = () => {
   }, [riderList, orders, riderFilterPeriod, riderFilterMonth, riderFilterYear]);
 
   // ปรับโครงสร้างราคา
-  const [pricing, setPricing] = useState(() => {
-    try {
-      const saved = localStorage.getItem('storePricing');
-      return saved ? JSON.parse(saved) : defaultPricing;
-    } catch (e) {
-      return defaultPricing;
-    }
-  });
+  const [pricing, setPricing] = useState(defaultPricing);
 
   const handlePriceChange = (category, id, newPrice) => {
     setPricing(prev => {
@@ -487,37 +486,39 @@ const DashboardPage = () => {
     });
   };
 
-  const handleSavePricing = () => {
+    const handleSavePricing = async () => {
     try {
-      localStorage.setItem('storePricing', JSON.stringify(pricing));
-      triggerToast('บันทึกโครงสร้างราคาบริการเรียบร้อยแล้ว');
+      const saved = await saveSettings({ pricing });
+      if (saved?.pricing) setPricing(saved.pricing);
+      triggerToast('บันทึกโครงสร้างราคาบริการเรียบร้อยแล้ว ลูกค้าจะเห็นราคาใหม่ทันที');
     } catch (e) {
-      triggerToast('บันทึกราคาไม่สำเร็จ', 'error');
+      triggerToast(e.response?.data?.message || 'บันทึกราคาไม่สำเร็จ', 'error');
     }
   };
 
   const [selectedRiders, setSelectedRiders] = useState({});
 
-  const [isStoreOpen, setIsStoreOpen] = useState(() => {
-    try {
-      const saved = localStorage.getItem('storeServiceStatus');
-      return saved !== null ? JSON.parse(saved) : true;
-    } catch (e) {
-      return true;
-    }
-  });
+  const [isStoreOpen, setIsStoreOpen] = useState(true);
 
  const [calendarYear, setCalendarYear] = useState(() => new Date().getFullYear());
  const [calendarMonth, setCalendarMonth] = useState(() => new Date().getMonth());
 
-  const [closedDates, setClosedDates] = useState(() => {
+  const [closedDates, setClosedDates] = useState([]);
+    const loadSettings = async () => {
     try {
-      const saved = localStorage.getItem('closedDates');
-      return saved ? JSON.parse(saved) : ['2026-09-15', '2026-09-16'];
+      const s = await fetchSettings();
+      setIsStoreOpen(s.storeOpen !== false);
+      setClosedDates(Array.isArray(s.closedDates) ? s.closedDates : []);
+      if (s.pricing) setPricing(s.pricing);
     } catch (e) {
-      return [];
+      console.error('Failed to load settings:', e);
     }
-  });
+  };
+
+  useEffect(() => {
+    loadSettings();
+    loadRiders();
+  }, []);
 
   if (!activeAdmin) return null;
 
@@ -992,28 +993,30 @@ const DashboardPage = () => {
     );
   };
 
-  const toggleStoreStatus = () => {
+   const toggleStoreStatus = async () => {
     const updated = !isStoreOpen;
     setIsStoreOpen(updated);
     try {
-      localStorage.setItem('storeServiceStatus', JSON.stringify(updated));
-    } catch (e) {}
-    triggerToast(updated ? 'เปิดระบบรับออเดอร์แล้ว' : 'ปิดระบบรับออเดอร์ชั่วคราวแล้ว', updated ? 'success' : 'info');
+      await saveSettings({ storeOpen: updated });
+      triggerToast(updated ? 'เปิดระบบรับออเดอร์แล้ว' : 'ปิดระบบรับออเดอร์ชั่วคราวแล้ว', updated ? 'success' : 'info');
+    } catch (e) {
+      setIsStoreOpen(!updated);
+      triggerToast('บันทึกไม่สำเร็จ กรุณาลองใหม่', 'error');
+    }
   };
 
-  const handleToggleClosedDate = (dateStr) => {
-    let updated;
-    if (closedDates.includes(dateStr)) {
-      updated = closedDates.filter(d => d !== dateStr);
-      triggerToast(`ยกเลิกวันหยุดวันที่ ${dateStr} แล้ว`);
-    } else {
-      updated = [...closedDates, dateStr];
-      triggerToast(`บันทึกวันหยุดวันที่ ${dateStr} เรียบร้อยแล้ว`);
-    }
+  const handleToggleClosedDate = async (dateStr) => {
+    const previous = closedDates;
+    const wasClosed = previous.includes(dateStr);
+    const updated = wasClosed ? previous.filter(d => d !== dateStr) : [...previous, dateStr];
     setClosedDates(updated);
     try {
-      localStorage.setItem('closedDates', JSON.stringify(updated));
-    } catch (e) {}
+      await saveSettings({ closedDates: updated });
+      triggerToast(wasClosed ? `ยกเลิกวันหยุดวันที่ ${dateStr} แล้ว` : `บันทึกวันหยุดวันที่ ${dateStr} เรียบร้อยแล้ว`);
+    } catch (e) {
+      setClosedDates(previous);
+      triggerToast('บันทึกไม่สำเร็จ กรุณาลองใหม่', 'error');
+    }
   };
 
   const handleLogout = () => {
@@ -3041,6 +3044,19 @@ const DashboardPage = () => {
                 value={newRiderForm.phone}
                 onChange={(e) => setNewRiderForm(prev => ({ ...prev, phone: e.target.value }))}
                 placeholder="เช่น 081-xxx-xxxx"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm mt-1 outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-600">รหัสผ่านสำหรับเข้าสู่ระบบ (6–20 ตัวอักษร)</label>
+              <input
+                type="text"
+                required
+                minLength={6}
+                maxLength={20}
+                value={newRiderForm.password}
+                onChange={(e) => setNewRiderForm(prev => ({ ...prev, password: e.target.value }))}
+                placeholder="ตั้งรหัสให้ไรเดอร์ แล้วแจ้งให้ทราบ"
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm mt-1 outline-none"
               />
             </div>

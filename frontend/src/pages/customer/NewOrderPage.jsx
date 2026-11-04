@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   ArrowLeft, 
@@ -15,6 +15,7 @@ import {
   HelpCircle 
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { fetchSettings } from '../../api/settings';
 
 export default function NewOrderPage() {
   const navigate = useNavigate();
@@ -30,14 +31,15 @@ export default function NewOrderPage() {
   const displayAddress = currentAddress ? `${currentAddress.title} ${currentAddress.detail}` : (reorderData.address || null);
 
   // ================= 1. ดึง Dynamic Pricing ที่แอดมินบันทึกไว้ =================
-  const dynamicPricing = useMemo(() => {
-    try {
-      const saved = localStorage.getItem('storePricing');
-      return saved ? JSON.parse(saved) : null;
-    } catch (e) {
-      return null;
-    }
-  }, []);
+  const [dynamicPricing, setDynamicPricing] = useState(null);
+
+   useEffect(() => {
+     let cancelled = false;
+     fetchSettings()
+       .then((s) => { if (!cancelled && s?.pricing) setDynamicPricing(s.pricing); })
+       .catch(() => {});
+     return () => { cancelled = true; };
+   }, []);
 
   // แพ็กเกจหลัก
   const packages = useMemo(() => {

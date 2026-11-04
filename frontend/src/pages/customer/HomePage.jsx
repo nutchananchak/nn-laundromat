@@ -32,6 +32,7 @@ import BottomNav from '../../components/layout/BottomNav';
 import { useApp } from '../../context/AppContext';
 import { fetchOrders, updateOrder } from '../../api/order';
 import { cacheOrders } from '../../utils/orderCache';
+import { fetchSettings } from '../../api/settings';
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -106,19 +107,20 @@ export default function HomePage() {
 
   // 2. ดึงสถานะร้าน วันหยุด และเช็กสถานะการแจ้งเตือน
   useEffect(() => {
-    const savedStoreStatus = localStorage.getItem('storeServiceStatus');
-    if (savedStoreStatus !== null) {
-      setIsStoreOpen(JSON.parse(savedStoreStatus));
-    }
-
-    const savedClosedDates = localStorage.getItem('closedDates');
-    if (savedClosedDates) {
-      try {
-        setClosedDates(JSON.parse(savedClosedDates));
-      } catch (e) {
-        setClosedDates([]);
-      }
-    }
+    const loadStoreSettings = async () => {
+       try {
+         const s = await fetchSettings();
+         setIsStoreOpen(s.storeOpen !== false);
+         setClosedDates(Array.isArray(s.closedDates) ? s.closedDates : []);
+       } catch (e) {}
+     };
+     loadStoreSettings();
+     const timer = setInterval(() => {
+       if (!document.hidden) loadStoreSettings();
+     }, 30000);
+     return () => clearInterval(timer);
+   }, []);
+    
 
     const checkUnreadNotices = () => {
       if (!currentUserId) {
@@ -150,7 +152,7 @@ export default function HomePage() {
       window.removeEventListener('storage', checkUnreadNotices);
       window.removeEventListener('focus', checkUnreadNotices);
     };
-  }, [currentUserId]);
+  }; [currentUserId];
 
   const getThaiTimestamp = () => {
     const now = new Date();
@@ -1057,4 +1059,3 @@ export default function HomePage() {
       </div>
     </div>
   );
-}
