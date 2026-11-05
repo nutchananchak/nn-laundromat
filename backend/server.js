@@ -7,6 +7,8 @@ import { testDatabaseConnection } from './src/config/db.js';
 import orderRoutes from './src/routes/orderRoutes.js';
 import authRoutes from './src/routes/authRoutes.js';
 import paymentRoutes from './src/routes/paymentRoutes.js';
+import settingsRoutes from './src/routes/settingsRoutes.js';
+import riderRoutes from './src/routes/riderRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -58,6 +60,8 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use('/api/orders', orderRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/settings', settingsRoutes);
+app.use('/api/riders', riderRoutes);
 
 app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'ok', message: 'N&N Laundromat Backend กำลังทำงานปกติ' });

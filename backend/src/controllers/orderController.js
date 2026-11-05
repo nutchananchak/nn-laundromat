@@ -1,5 +1,7 @@
 import pool from '../config/db.js';
 import { uploadImage } from '../utils/cloudinary.js';
+import { readSettings } from './settingsController.js';
+import { computeOrderPrice } from '../utils/pricing.js';
 
 const getNextRunningOrderId = async (connection) => {
   const [rows] = await connection.query(`
@@ -189,6 +191,30 @@ export const createOrder = async (req, res) => {
     await connection.beginTransaction();
 
         const data = req.body;
+        const settings = await readSettings();
+        const bangkokToday = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+          if (settings.storeOpen === false) {
+            await connection.rollback();
+            return res.status(403).json({ message: 'ขณะนี้ร้านปิดรับออเดอร์ชั่วคราว' });
+          }
+          if ((settings.closedDates || []).includes(bangkokToday)) {
+            await connection.rollback();
+            return res.status(403).json({ message: 'วันนี้ร้านหยุดทำการ ขออภัยในความไม่สะดวก' });
+          }
+        const priced = computeOrderPrice(settings.pricing, data);
+          if (priced.error) {
+            await connection.rollback();
+            return res.status(400).json({ message: priced.error });
+          }
+          if (Number(data.totalPrice) !== priced.total) {
+            await connection.rollback();
+            return res.status(409).json({
+              message: 'ราคาบริการมีการเปลี่ยนแปลง กรุณากลับไปหน้าสั่งซื้อและทำรายการใหม่อีกครั้ง',
+            });
+          }
+          data.totalPrice = priced.total;
+          data.specialItems = priced.specialItems;
+          data.plasticBagCount = priced.plasticBagCount;
 
     // ใช้ข้อมูลจากบัญชีที่ล็อกอิน ไม่เชื่อชื่อ/เบอร์ที่หน้าเว็บส่งมา และไม่สร้างลูกค้าอัตโนมัติอีก
     const [me] = await connection.query(
