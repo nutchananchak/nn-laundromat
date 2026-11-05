@@ -227,6 +227,7 @@ export default function PaymentPage() {
           customerPhone: orderData.customerPhone || customerPhone,
           serviceName: orderData.serviceName || 'ซัก อบ พับ',
           packageName: orderData.packageName || '',
+          packageId: orderData.packageId || '',
           pickupTime: orderData.pickupTime || '',
           deliveryTime: orderData.deliveryTime || '',
           specialItems: orderData.specialItems || [],

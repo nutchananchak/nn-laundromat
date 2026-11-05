@@ -290,6 +290,7 @@ export default function NewOrderPage() {
           customerPhone: userProfile?.phone || '',
           serviceName: serviceType === 'bedding' ? 'ชุดเครื่องนอน / ผ้านวม' : 'ซัก อบ พับ',
           packageName: currentPkg ? currentPkg.name : 'เฉพาะรายการพิเศษ',
+          packageId: currentPkg ? currentPkg.id : '',
           pickupTime,
           deliveryTime,
           specialItems: selectedSpecialItems,
