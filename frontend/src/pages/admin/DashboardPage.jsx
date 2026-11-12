@@ -1424,10 +1424,10 @@ const DashboardPage = () => {
           <div>
             <h1 className="font-heading font-bold text-base text-slate-900 leading-tight">
               {activeTab === 'slips' && 'ตรวจสอบสลิปและมอบหมายไรเดอร์'}
-              {activeTab === 'in_progress' && 'รายการออเดอร์ที่กำลังดำเนินการ (In Progress)'}
+              {activeTab === 'in_progress' && 'รายการออเดอร์ที่กำลังดำเนินการ'}
               {activeTab === 'riders' && 'ระบบบริหารจัดการไรเดอร์และสถิติการวิ่งงาน'}
               {activeTab === 'pricing' && 'ระบบปรับโครงสร้างราคาและค่าบริการ'}
-              {activeTab === 'customers' && 'สถิติความถี่การใช้บริการของลูกค้าต่อปี (Customer Annual Frequency)'}
+              {activeTab === 'customers' && 'สถิติความถี่การใช้บริการของลูกค้าต่อปี'}
               {activeTab === 'completed' && 'รายการที่ไรเดอร์ส่งมอบผ้าสำเร็จแล้ว'}
               {activeTab === 'cancelled' && 'รายการคำสั่งซื้อที่ยกเลิก'}
               {activeTab === 'analytics' && 'ภาพรวมรายรับ (รายวัน / รายสัปดาห์ / รายเดือน / รายปี)'}
