@@ -21,7 +21,7 @@ const normalizePhone = (phone) => {
   return String(phone).replace(/[^0-9]/g, '').trim();
 };
 
-// 1. สร้าง PromptPay QR Code จริงตามมาตรฐาน EMVCo
+// 1. สร้าง PromptPay QR Code 
 export const generatePromptPayQR = async (req, res) => {
   try {
     const { amount } = req.body;

@@ -506,6 +506,7 @@ export const updateOrderStatus = async (req, res) => {
     if (body.verifiedAt !== undefined) { orderFields.push('verified_at = ?'); orderValues.push(body.verifiedAt); }
     if (body.cancelReason !== undefined) { orderFields.push('cancel_reason = ?'); orderValues.push(body.cancelReason); }
     if (body.cancelledAt !== undefined) { orderFields.push('cancelled_at = ?'); orderValues.push(body.cancelledAt); }
+    if (body.deliveredAt !== undefined) { orderFields.push('delivered_at = ?'); orderValues.push(String(body.deliveredAt)); }
 
     // มอบหมายไรเดอร์
     if (body.rider && body.rider.id) {
