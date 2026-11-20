@@ -46,7 +46,7 @@ export default function PaymentPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
 
-  // State สำหรับ PromptPay QR Code จริงจาก Backend
+  //State สำหรับ PromptPay QR Code จาก Backend
   const [qrCodeUrl, setQrCodeUrl] = useState('');
   const [isQrLoading, setIsQrLoading] = useState(false);
   const [isDownloadingQr, setIsDownloadingQr] = useState(false);
