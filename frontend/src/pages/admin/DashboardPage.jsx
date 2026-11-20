@@ -2086,8 +2086,8 @@ const DashboardPage = () => {
                       onChange={(e) => setSelectedYear(Number(e.target.value))}
                       className="appearance-none bg-white border border-slate-200 hover:border-[#1d61f2] focus:border-[#1d61f2] rounded-2xl pl-3.5 pr-8 py-2 text-xs font-bold text-slate-700 outline-none cursor-pointer transition shadow-2xs"
                     >
-                      <option value={2026}>ปี พ.ศ. 2569 (2026)</option>
-                      <option value={2027}>ปี พ.ศ. 2570 (2027)</option>
+                      <option value={2026}>ปี พ.ศ. 2569</option>
+                      <option value={2027}>ปี พ.ศ. 2570</option>
                     </select>
                     <ChevronDown size={14} className="text-slate-400 absolute right-2.5 pointer-events-none" />
                   </div>
